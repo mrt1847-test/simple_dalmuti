@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>달무티 게임 - 닉네임 입력</title>
+  <style>
+    body { display: flex; justify-content: center; align-items: center; height: 100vh; background: #f5f5dc; }
+    .container { background: white; padding: 2rem 3rem; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+    h1 { text-align: center; margin-bottom: 1.5rem; }
+    input[type="text"] { width: 100%; padding: 0.7rem; font-size: 1.1rem; border-radius: 6px; border: 1px solid #ccc; margin-bottom: 1rem; }
+    button { width: 100%; padding: 0.7rem; font-size: 1.1rem; border-radius: 6px; border: none; background: #8bc34a; color: white; cursor: pointer; }
+    button:hover { background: #689f38; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>달무티 게임</h1>
+    <form id="nicknameForm">
+      <input type="text" id="nickname" placeholder="닉네임을 입력하세요" required maxlength="12" autofocus />
+      <button type="submit">입장하기</button>
+    </form>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const form = document.getElementById('nicknameForm');
+    const container = document.querySelector('.container');
+
+    function showLobby(nickname) {
+      container.innerHTML = `
+        <h1>달무티 대기방</h1>
+        <div id="players" style="margin-bottom:1.5rem;"></div>
+        <button id="readyBtn" style="display:block;margin:0 auto 0 auto;padding:0.7rem 2rem;font-size:1.2rem;">게임 준비</button>
+        <div id="status" style="text-align:center;margin-top:1rem;"></div>
+      `;
+      document.getElementById('readyBtn').onclick = () => {
+        socket.emit('ready');
+        document.getElementById('readyBtn').disabled = true;
+        document.getElementById('status').innerText = '준비 완료! 다른 인원을 기다리는 중...';
+      };
+    }
+
+    function updatePlayers(players) {
+      const playersDiv = document.getElementById('players');
+      if (!playersDiv) return;
+      playersDiv.innerHTML =
+        `<b>입장 인원 (${players.length}/6)</b><ul style='padding-left:1.2em;'>` +
+        players.map(p => `<li>${p.nickname} ${p.ready ? '✅' : ''}</li>`).join('') +
+        '</ul>';
+    }
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const nickname = document.getElementById('nickname').value.trim();
+      if(nickname) {
+        socket.emit('join', nickname, (res) => {
+          if(res.success) {
+            showLobby(nickname);
+          } else {
+            alert(res.message);
+          }
+        });
+      }
+    });
+
+    socket.on('players', updatePlayers);
+    socket.on('gameStart', () => {
+      container.innerHTML = '<h1 style="text-align:center;">게임 시작!</h1><div style="text-align:center;">곧 게임 화면이 표시됩니다.</div>';
+    });
+  </script>
+</body>
+</html> 
