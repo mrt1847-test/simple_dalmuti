@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>달무티 게임</title>
+  <style>
+    body { display: flex; justify-content: center; align-items: center; height: 100vh; background: #f5f5dc; }
+    #mainWrap { display: flex; flex-direction: row; justify-content: center; align-items: flex-start; }
+    #gameArea { min-width: 420px; }
+    #chatWrap { width: 260px; margin-left: 2em; background: #fff; border-radius: 10px; box-shadow: 0 1px 8px rgba(0,0,0,0.08); display: flex; flex-direction: column; height: 540px; }
+    #chatMessages { flex: 1; overflow-y: auto; padding: 1em; font-size: 1em; }
+    #chatInputWrap { display: flex; border-top: 1px solid #eee; }
+    #chatInput { flex: 1 1 auto; min-width: 0; border: none; padding: 0.7em; font-size: 1em; border-radius: 0 0 0 10px; }
+    #chatSend { width: 56px; border: none; background: #8bc34a; color: #fff; font-size: 1em; border-radius: 0 0 10px 0; cursor: pointer; }
+    #chatSend:hover { background: #689f38; }
+  </style>
+</head>
+<body>
+  <div id="mainWrap">
+    <div id="gameArea">
+      <h1 style="text-align:center;">달무티 게임</h1>
+      <div id="gameContent"></div>
+    </div>
+    <div id="chatWrap">
+      <div id="chatMessages"></div>
+      <div id="chatInputWrap">
+        <input type="text" id="chatInput" placeholder="메시지 입력..." autocomplete="off" />
+        <button id="chatSend">전송</button>
+      </div>
+    </div>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const nickname = localStorage.getItem('dalmuti_nickname');
+      if (!nickname) window.location.href = '/join.html';
+
+      const socket = io();
+
+      // ★ 서버에 닉네임을 알림
+      socket.emit('join', nickname, (res) => {
+        if (!res.success && res.message !== '중복 닉네임') {
+          alert(res.message);
+          window.location.href = '/join.html';
+        }
+      });
+
+      // 게임 상태 변수
+      let myCards = [];
+      let selected = [];
+      let myIdx = null;
+      let turnInfo = null;
+      let field = null;
+
+      // 신분 및 자리 배정 결과(원형 테이블)
+      socket.on('roleAssigned', (ordered) => {
+        const gameContent = document.getElementById('gameContent');
+        if (!gameContent) return;
+        const n = ordered.length;
+        const radius = 160;
+        let html = '<h1 style="text-align:center;">신분 및 자리 배정 결과</h1>';
+        html += '<div style="position:relative;width:400px;height:400px;margin:0 auto;background:#f5f5dc;border-radius:50%;box-shadow:0 2px 12px rgba(0,0,0,0.08);">';
+        ordered.forEach((p, i) => {
+          const angle = (2 * Math.PI * i) / n - Math.PI/2;
+          const x = 200 + radius * Math.cos(angle) - 60;
+          const y = 200 + radius * Math.sin(angle) - 40;
+          html += `<div style="position:absolute;left:${x}px;top:${y}px;width:120px;height:80px;text-align:center;background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.08);padding:0.5em 0.2em;display:flex;flex-direction:column;justify-content:center;align-items:center;">
+            <div style='font-weight:bold;font-size:1.1em;'>${p.role}</div>
+            <div style='margin:0.2em 0;'>${p.nickname}</div>
+            <div style='font-size:0.9em;color:#888;'>카드: ${p.card}</div>
+          </div>`;
+        });
+        html += '<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:1.3em;font-weight:bold;">달무티<br>테이블</div>';
+        html += '</div>';
+        gameContent.innerHTML = html;
+      });
+
+      // 내 카드 표시 및 카드 제출/패스 UI
+      function renderHand() {
+        const gameContent = document.getElementById('gameContent');
+        if (!gameContent) return;
+        let html = '<h1 style="text-align:center;">내 카드</h1>';
+        if (field && field.cards) {
+          html += '<div style="text-align:center;margin-bottom:1em;">';
+          html += `<b>필드:</b> ${field.cards.map(c => c==='J'?'🃏':c).join(' ')} (${field.count}장, ${field.number} 이하만 가능)`;
+          html += '</div>';
+        }
+        html += '<div id="handArea" style="display:flex;flex-wrap:wrap;justify-content:center;gap:0.5em 0.3em;">';
+        myCards.forEach((card, i) => {
+          const isSelected = selected.includes(i);
+          html += `<div class="cardBtn" data-idx="${i}" style="width:48px;height:72px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:2px solid ${isSelected ? '#ff9800' : '#bdb76b'};border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.3em;font-weight:bold;box-shadow:0 1px 4px rgba(0,0,0,0.08);cursor:pointer;">${card === 'J' ? '🃏' : card}</div>`;
+        });
+        html += '</div>';
+        html += '<div style="text-align:center;margin-top:1.5em;">';
+        html += '<button id="submitBtn" style="padding:0.7em 2em;font-size:1.1em;margin-right:1em;">제출</button>';
+        html += '<button id="passBtn" style="padding:0.7em 2em;font-size:1.1em;">패스</button>';
+        html += '</div>';
+        gameContent.innerHTML = html;
+
+        // 카드 선택
+        document.querySelectorAll('.cardBtn').forEach(btn => {
+          btn.onclick = function() {
+            const idx = parseInt(this.getAttribute('data-idx'));
+            if (selected.length === 0) {
+              selected.push(idx);
+            } else {
+              const firstCard = myCards[selected[0]];
+              if (selected.includes(idx)) {
+                selected = selected.filter(i => i !== idx);
+              } else if (myCards[idx] === firstCard) {
+                selected.push(idx);
+              } else {
+                alert('같은 숫자만 여러 장 선택할 수 있습니다.');
+              }
+            }
+            renderHand();
+          };
+        });
+        // 제출 버튼
+        document.getElementById('submitBtn').onclick = function() {
+          if (turnInfo && turnInfo.turnIdx !== myIdx) {
+            alert('아직 내 차례가 아닙니다!');
+            return;
+          }
+          if (selected.length === 0) {
+            alert('제출할 카드를 선택하세요.');
+            return;
+          }
+          const cards = selected.map(i => myCards[i]);
+          socket.emit('playCards', cards, (res) => {
+            if (res && !res.success) {
+              alert(res.message);
+            }
+          });
+        };
+        // 패스 버튼
+        document.getElementById('passBtn').onclick = function() {
+          if (turnInfo && turnInfo.turnIdx !== myIdx) {
+            alert('아직 내 차례가 아닙니다!');
+            return;
+          }
+          socket.emit('passTurn');
+        };
+      }
+      socket.on('dealCards', (cards) => {
+        myCards = cards;
+        selected = [];
+        renderHand();
+      });
+
+      // 턴 정보, 제출/패스 결과, 새 라운드 등은 필요에 따라 추가 구현
+      // ... (이전 index.html의 게임 관련 socket.on 이벤트를 참고해 추가 구현 가능) ...
+
+      // 채팅 기능
+      const chatMessages = document.getElementById('chatMessages');
+      const chatInput = document.getElementById('chatInput');
+      const chatSend = document.getElementById('chatSend');
+      function appendChat(msg, isMine) {
+        const div = document.createElement('div');
+        div.textContent = msg;
+        div.style.margin = '0.2em 0';
+        if (isMine) div.style.textAlign = 'right';
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+      chatSend.onclick = sendChat;
+      chatInput.onkeydown = function(e) { if (e.key === 'Enter') sendChat(); };
+      function sendChat() {
+        const msg = chatInput.value.trim();
+        if (!msg) return;
+        socket.emit('chat', msg);
+        appendChat(`나: ${msg}`, true);
+        chatInput.value = '';
+      }
+      socket.on('chat', ({nickname, msg}) => {
+        appendChat(`${nickname}: ${msg}`);
+      });
+
+      // 1~12 중 6개 숫자 중 내 숫자 보여주기
+      socket.on('showNumber', (num) => {
+        const gameContent = document.getElementById('gameContent');
+        if (!gameContent) return;
+        gameContent.innerHTML = `<div style="text-align:center;font-size:2em;margin-top:2em;">당신의 숫자: <b>${num}</b></div>`;
+        setTimeout(() => {
+          gameContent.innerHTML = '<div style="text-align:center;">게임이 곧 시작됩니다...</div>';
+        }, 5000);
+      });
+    });
+  </script>
+</body>
+</html> 

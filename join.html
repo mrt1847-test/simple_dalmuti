@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>달무티 입장</title>
+  <style>
+    body { display: flex; justify-content: center; align-items: center; height: 100vh; background: #f5f5dc; }
+    .container { background: white; padding: 2rem 3rem; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+    h1 { text-align: center; margin-bottom: 1.5rem; }
+    input[type="text"] { width: 100%; padding: 0.7rem; font-size: 1.1rem; border-radius: 6px; border: 1px solid #ccc; margin-bottom: 1rem; }
+    button { width: 100%; padding: 0.7rem; font-size: 1.1rem; border-radius: 6px; border: none; background: #8bc34a; color: white; cursor: pointer; }
+    button:hover { background: #689f38; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>달무티 게임 입장</h1>
+    <form id="nicknameForm">
+      <input type="text" id="nickname" placeholder="닉네임을 입력하세요" required maxlength="12" autofocus />
+      <button type="submit">입장하기</button>
+    </form>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    document.getElementById('nicknameForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const nickname = document.getElementById('nickname').value.trim();
+      if(nickname) {
+        socket.emit('join', nickname, (res) => {
+          if(res.success) {
+            localStorage.setItem('dalmuti_nickname', nickname);
+            window.location.href = '/lobby.html';
+          } else {
+            alert(res.message);
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html> 

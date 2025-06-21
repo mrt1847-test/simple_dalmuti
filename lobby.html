@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>달무티 대기방</title>
+  <style>
+    body { display: flex; justify-content: center; align-items: center; height: 100vh; background: #f5f5dc; }
+    #mainWrap { display: flex; flex-direction: row; justify-content: center; align-items: flex-start; }
+    #lobbyArea { min-width: 420px; }
+    #chatWrap { width: 260px; margin-left: 2em; background: #fff; border-radius: 10px; box-shadow: 0 1px 8px rgba(0,0,0,0.08); display: flex; flex-direction: column; height: 540px; }
+    #chatMessages { flex: 1; overflow-y: auto; padding: 1em; font-size: 1em; }
+    #chatInputWrap { display: flex; border-top: 1px solid #eee; }
+    #chatInput { flex: 1 1 auto; min-width: 0; border: none; padding: 0.7em; font-size: 1em; border-radius: 0 0 0 10px; }
+    #chatSend { width: 56px; border: none; background: #8bc34a; color: #fff; font-size: 1em; border-radius: 0 0 10px 0; cursor: pointer; }
+    #chatSend:hover { background: #689f38; }
+    button { padding: 0.7rem 2rem; font-size: 1.1rem; border-radius: 6px; border: none; background: #8bc34a; color: white; cursor: pointer; margin-top: 1em; }
+    button:hover { background: #689f38; }
+  </style>
+</head>
+<body>
+  <div id="mainWrap">
+    <div id="lobbyArea">
+      <h1>달무티 대기방</h1>
+      <div id="players" style="margin-bottom:1.5rem;"></div>
+      <button id="readyBtn">게임 준비</button>
+      <div id="status" style="text-align:center;margin-top:1rem;"></div>
+    </div>
+    <div id="chatWrap">
+      <div id="chatMessages"></div>
+      <div id="chatInputWrap">
+        <input type="text" id="chatInput" placeholder="메시지 입력..." autocomplete="off" />
+        <button id="chatSend">전송</button>
+      </div>
+    </div>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const nickname = localStorage.getItem('dalmuti_nickname');
+    if (!nickname) window.location.href = '/join.html';
+
+    socket.emit('join', nickname, (res) => {
+      if (!res.success && res.message !== '중복 닉네임') {
+        alert(res.message);
+        window.location.href = '/join.html';
+      }
+    });
+
+    let ready = false;
+    document.getElementById('readyBtn').onclick = () => {
+      if (!ready) {
+        socket.emit('ready');
+        ready = true;
+        document.getElementById('readyBtn').textContent = '준비 취소';
+        document.getElementById('status').innerText = '준비 완료! 다른 인원을 기다리는 중...';
+      } else {
+        socket.emit('unready');
+        ready = false;
+        document.getElementById('readyBtn').textContent = '게임 준비';
+        document.getElementById('status').innerText = '';
+      }
+    };
+    socket.on('players', (players) => {
+      const playersDiv = document.getElementById('players');
+      playersDiv.innerHTML = `<b>입장 인원 (${players.length}/6)</b><ul style='padding-left:1.2em;'>` +
+        players.map(p => `<li>${p.nickname} ${p.ready ? '✅' : ''}</li>`).join('') +
+        '</ul>';
+    });
+    socket.on('gameStart', () => {
+      window.location.href = '/game.html';
+    });
+    // 채팅 기능
+    const chatMessages = document.getElementById('chatMessages');
+    const chatInput = document.getElementById('chatInput');
+    const chatSend = document.getElementById('chatSend');
+    function appendChat(msg, isMine) {
+      const div = document.createElement('div');
+      div.textContent = msg;
+      div.style.margin = '0.2em 0';
+      if (isMine) div.style.textAlign = 'right';
+      chatMessages.appendChild(div);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+    chatSend.onclick = sendChat;
+    chatInput.onkeydown = function(e) { if (e.key === 'Enter') sendChat(); };
+    function sendChat() {
+      const msg = chatInput.value.trim();
+      if (!msg) return;
+      socket.emit('chat', msg);
+      appendChat(`나: ${msg}`, true);
+      chatInput.value = '';
+    }
+    socket.on('chat', ({nickname, msg}) => {
+      appendChat(`${nickname}: ${msg}`);
+    });
+  </script>
+</body>
+</html> 
