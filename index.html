@@ -11,15 +11,25 @@
     input[type="text"] { width: 100%; padding: 0.7rem; font-size: 1.1rem; border-radius: 6px; border: 1px solid #ccc; margin-bottom: 1rem; }
     button { width: 100%; padding: 0.7rem; font-size: 1.1rem; border-radius: 6px; border: none; background: #8bc34a; color: white; cursor: pointer; }
     button:hover { background: #689f38; }
+    #mainWrap { display: flex; flex-direction: row; justify-content: center; align-items: flex-start; }
+    #gameArea { min-width: 420px; }
+    #chatWrap { width: 260px; margin-left: 2em; background: #fff; border-radius: 10px; box-shadow: 0 1px 8px rgba(0,0,0,0.08); display: flex; flex-direction: column; height: 540px; }
+    #chatMessages { flex: 1; overflow-y: auto; padding: 1em; font-size: 1em; }
+    #chatInputWrap { display: flex; border-top: 1px solid #eee; }
+    #chatInput { flex: 1; border: none; padding: 0.7em; font-size: 1em; border-radius: 0 0 0 10px; }
+    #chatSend { border: none; background: #8bc34a; color: #fff; font-size: 1em; padding: 0 1em; border-radius: 0 0 10px 0; cursor: pointer; }
+    #chatSend:hover { background: #689f38; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>달무티 게임</h1>
-    <form id="nicknameForm">
-      <input type="text" id="nickname" placeholder="닉네임을 입력하세요" required maxlength="12" autofocus />
-      <button type="submit">입장하기</button>
-    </form>
+  <div id="mainWrap">
+    <div id="gameArea">
+      <h1>달무티 게임</h1>
+      <form id="nicknameForm">
+        <input type="text" id="nickname" placeholder="닉네임을 입력하세요" required maxlength="12" autofocus />
+        <button type="submit">입장하기</button>
+      </form>
+    </div>
   </div>
   <script src="/socket.io/socket.io.js"></script>
   <script>
@@ -27,12 +37,28 @@
     const form = document.getElementById('nicknameForm');
     const container = document.querySelector('.container');
 
+    let myCards = [];
+    let myIdx = null;
+    let turnInfo = null;
+    let selected = [];
+    let field = null;
+    let myNickname = null;
+
     function showLobby(nickname) {
-      container.innerHTML = `
-        <h1>달무티 대기방</h1>
-        <div id="players" style="margin-bottom:1.5rem;"></div>
-        <button id="readyBtn" style="display:block;margin:0 auto 0 auto;padding:0.7rem 2rem;font-size:1.2rem;">게임 준비</button>
-        <div id="status" style="text-align:center;margin-top:1rem;"></div>
+      document.getElementById('mainWrap').innerHTML = `
+        <div id="gameArea">
+          <h1>달무티 대기방</h1>
+          <div id="players" style="margin-bottom:1.5rem;"></div>
+          <button id="readyBtn" style="display:block;margin:0 auto 0 auto;padding:0.7rem 2rem;font-size:1.2rem;">게임 준비</button>
+          <div id="status" style="text-align:center;margin-top:1rem;"></div>
+        </div>
+        <div id="chatWrap">
+          <div id="chatMessages"></div>
+          <div id="chatInputWrap">
+            <input type="text" id="chatInput" placeholder="메시지 입력..." autocomplete="off" />
+            <button id="chatSend">전송</button>
+          </div>
+        </div>
       `;
       document.getElementById('readyBtn').onclick = () => {
         socket.emit('ready');
@@ -50,6 +76,71 @@
         '</ul>';
     }
 
+    function renderHand() {
+      let html = '<h1 style="text-align:center;">내 카드</h1>';
+      if (field && field.cards) {
+        html += '<div style="text-align:center;margin-bottom:1em;">';
+        html += `<b>필드:</b> ${field.cards.map(c => c==='J'?'🃏':c).join(' ')} (${field.count}장, ${field.number} 이하만 가능)`;
+        html += '</div>';
+      }
+      html += '<div id="handArea" style="display:flex;flex-wrap:wrap;justify-content:center;gap:0.5em 0.3em;">';
+      myCards.forEach((card, i) => {
+        const isSelected = selected.includes(i);
+        html += `<div class="cardBtn" data-idx="${i}" style="width:48px;height:72px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:2px solid ${isSelected ? '#ff9800' : '#bdb76b'};border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.3em;font-weight:bold;box-shadow:0 1px 4px rgba(0,0,0,0.08);cursor:pointer;">${card === 'J' ? '🃏' : card}</div>`;
+      });
+      html += '</div>';
+      html += '<div style="text-align:center;margin-top:1.5em;">';
+      html += '<button id="submitBtn" style="padding:0.7em 2em;font-size:1.1em;margin-right:1em;">제출</button>';
+      html += '<button id="passBtn" style="padding:0.7em 2em;font-size:1.1em;">패스</button>';
+      html += '</div>';
+      container.innerHTML = html;
+
+      // 카드 선택
+      document.querySelectorAll('.cardBtn').forEach(btn => {
+        btn.onclick = function() {
+          const idx = parseInt(this.getAttribute('data-idx'));
+          if (selected.length === 0) {
+            selected.push(idx);
+          } else {
+            const firstCard = myCards[selected[0]];
+            if (selected.includes(idx)) {
+              selected = selected.filter(i => i !== idx);
+            } else if (myCards[idx] === firstCard) {
+              selected.push(idx);
+            } else {
+              alert('같은 숫자만 여러 장 선택할 수 있습니다.');
+            }
+          }
+          renderHand();
+        };
+      });
+      // 제출 버튼
+      document.getElementById('submitBtn').onclick = function() {
+        if (turnInfo && turnInfo.turnIdx !== myIdx) {
+          alert('아직 내 차례가 아닙니다!');
+          return;
+        }
+        if (selected.length === 0) {
+          alert('제출할 카드를 선택하세요.');
+          return;
+        }
+        const cards = selected.map(i => myCards[i]);
+        socket.emit('playCards', cards, (res) => {
+          if (res && !res.success) {
+            alert(res.message);
+          }
+        });
+      };
+      // 패스 버튼
+      document.getElementById('passBtn').onclick = function() {
+        if (turnInfo && turnInfo.turnIdx !== myIdx) {
+          alert('아직 내 차례가 아닙니다!');
+          return;
+        }
+        socket.emit('passTurn');
+      };
+    }
+
     form.addEventListener('submit', function(e) {
       e.preventDefault();
       const nickname = document.getElementById('nickname').value.trim();
@@ -57,6 +148,7 @@
         socket.emit('join', nickname, (res) => {
           if(res.success) {
             showLobby(nickname);
+            myNickname = nickname;
           } else {
             alert(res.message);
           }
@@ -66,7 +158,137 @@
 
     socket.on('players', updatePlayers);
     socket.on('gameStart', () => {
-      container.innerHTML = '<h1 style="text-align:center;">게임 시작!</h1><div style="text-align:center;">곧 게임 화면이 표시됩니다.</div>';
+      container.innerHTML = '<h1 style="text-align:center;">카드 뽑기</h1><div id="pickArea" style="text-align:center;"></div>';
+    });
+
+    socket.on('pickCard', (cards) => {
+      const pickArea = document.getElementById('pickArea');
+      if (!pickArea) return;
+      pickArea.innerHTML = '<div>아래 카드 중 하나를 선택하세요:</div>' +
+        cards.map(card => `<button class="cardBtn" style="margin:1rem;font-size:2rem;padding:1rem 2rem;">${card}</button>`).join('');
+      Array.from(document.getElementsByClassName('cardBtn')).forEach(btn => {
+        btn.onclick = function() {
+          const num = parseInt(this.innerText);
+          socket.emit('cardPicked', num);
+          pickArea.innerHTML = '<div>선택 완료! 다른 인원을 기다리는 중...</div>';
+        };
+      });
+    });
+
+    socket.on('roleAssigned', (ordered) => {
+      // 원형 테이블 UI 생성
+      const n = ordered.length;
+      const radius = 160;
+      let html = '<h1 style="text-align:center;">신분 및 자리 배정 결과</h1>';
+      html += '<div style="position:relative;width:400px;height:400px;margin:0 auto;background:#f5f5dc;border-radius:50%;box-shadow:0 2px 12px rgba(0,0,0,0.08);">';
+      ordered.forEach((p, i) => {
+        const angle = (2 * Math.PI * i) / n - Math.PI/2;
+        const x = 200 + radius * Math.cos(angle) - 60;
+        const y = 200 + radius * Math.sin(angle) - 40;
+        html += `<div style="position:absolute;left:${x}px;top:${y}px;width:120px;height:80px;text-align:center;background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.08);padding:0.5em 0.2em;display:flex;flex-direction:column;justify-content:center;align-items:center;">
+          <div style='font-weight:bold;font-size:1.1em;'>${p.role}</div>
+          <div style='margin:0.2em 0;'>${p.nickname}</div>
+          <div style='font-size:0.9em;color:#888;'>카드: ${p.card}</div>
+        </div>`;
+      });
+      html += '<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:1.3em;font-weight:bold;">달무티<br>테이블</div>';
+      html += '</div>';
+      container.innerHTML = html;
+    });
+
+    socket.on('dealCards', (cards) => {
+      myCards = cards;
+      selected = [];
+      renderHand();
+    });
+
+    socket.on('turnInfo', (info) => {
+      turnInfo = info;
+      if (myIdx === null && info.order) {
+        myIdx = info.order.findIndex(p => p.id === socket.id);
+      }
+      // 내 차례면 카드 제출/패스 UI 활성화
+      if (myCards.length > 0) renderHand();
+      // 턴 정보 표시(간단)
+      if (info.order) {
+        let turnHtml = '<div style="text-align:center;margin-top:1em;">';
+        turnHtml += info.order.map((p, i) => `<span style="margin:0 0.5em;${i===info.turnIdx?'color:#d32f2f;font-weight:bold;':''}">${p.nickname}${info.finished[i]?'(끝)':''}</span>`).join('→');
+        turnHtml += '</div>';
+        container.innerHTML += turnHtml;
+      }
+    });
+
+    socket.on('playResult', ({playerIdx, cards, lastPlay, finished}) => {
+      if (playerIdx === myIdx) {
+        selected.sort((a,b)=>b-a).forEach(i => myCards.splice(i,1));
+        selected = [];
+      }
+      if (lastPlay) {
+        field = {cards, count: lastPlay.count, number: lastPlay.number};
+      }
+      renderHand();
+    });
+
+    socket.on('passResult', ({playerIdx, passes}) => {
+      if (playerIdx === myIdx) {
+        selected = [];
+      }
+      renderHand();
+    });
+
+    socket.on('newRound', ({turnIdx, lastPlay}) => {
+      alert('새 라운드! 마지막 낸 사람이 시작합니다.');
+      field = null;
+      renderHand();
+    });
+
+    socket.on('gameEnd', (result) => {
+      let html = '<h1 style="text-align:center;">게임 종료</h1>';
+      html += '<table style="margin:0 auto;border-collapse:collapse;">';
+      html += '<tr><th style="padding:0.5em 1em;">순위</th><th style="padding:0.5em 1em;">닉네임</th><th style="padding:0.5em 1em;">신분</th><th style="padding:0.5em 1em;">점수</th><th style="padding:0.5em 1em;">누적점수</th></tr>';
+      result.forEach((r, i) => {
+        html += `<tr><td style='padding:0.5em 1em;'>${i+1}</td><td style='padding:0.5em 1em;'>${r.nickname}</td><td style='padding:0.5em 1em;'>${r.role}</td><td style='padding:0.5em 1em;'>${r.score}</td><td style='padding:0.5em 1em;'>${r.total}</td></tr>`;
+      });
+      html += '</table>';
+      html += '<div style="text-align:center;margin-top:1em;">잠시 후 다음 게임이 시작됩니다...</div>';
+      container.innerHTML = html;
+    });
+
+    socket.on('finalResult', (finalOrder) => {
+      let html = '<h1 style="text-align:center;">최종 우승자</h1>';
+      html += `<div style='text-align:center;font-size:1.3em;font-weight:bold;margin-bottom:1em;'>🏆 ${finalOrder[0].nickname} (${finalOrder[0].score}점)</div>`;
+      html += '<table style="margin:0 auto;border-collapse:collapse;">';
+      html += '<tr><th style="padding:0.5em 1em;">최종순위</th><th style="padding:0.5em 1em;">닉네임</th><th style="padding:0.5em 1em;">총점</th></tr>';
+      finalOrder.forEach((r, i) => {
+        html += `<tr><td style='padding:0.5em 1em;'>${i+1}</td><td style='padding:0.5em 1em;'>${r.nickname}</td><td style='padding:0.5em 1em;'>${r.score}</td></tr>`;
+      });
+      html += '</table>';
+      container.innerHTML = html;
+    });
+
+    // 채팅 기능 (로비/게임에서만)
+    const chatMessages = document.getElementById('chatMessages');
+    const chatInput = document.getElementById('chatInput');
+    const chatSend = document.getElementById('chatSend');
+    function appendChat(msg, isMine) {
+      const div = document.createElement('div');
+      div.textContent = msg;
+      div.style.margin = '0.2em 0';
+      if (isMine) div.style.textAlign = 'right';
+      chatMessages.appendChild(div);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+    chatSend.onclick = sendChat;
+    chatInput.onkeydown = function(e) { if (e.key === 'Enter') sendChat(); };
+    function sendChat() {
+      const msg = chatInput.value.trim();
+      if (!msg) return;
+      socket.emit('chat', msg);
+      appendChat(`나: ${msg}`, true);
+      chatInput.value = '';
+    }
+    socket.on('chat', ({nickname, msg}) => {
+      appendChat(`${nickname}: ${msg}`);
     });
   </script>
 </body>
