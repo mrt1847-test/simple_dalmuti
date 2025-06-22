@@ -338,7 +338,7 @@ io.on('connection', (socket) => {
     console.log(`Active players: ${activePlayersCount}`);
 
     // 모두 패스 -> 라운드 리셋
-    if (game.passes >= activePlayersCount) {
+    if (game.passes >= activePlayersCount-1) {
       console.log('*** All active players have passed. Starting a new round. ***');
       game.passes = 0;
       // 마지막으로 카드를 낸 사람이 턴을 잡음
