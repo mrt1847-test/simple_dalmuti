@@ -61,148 +61,166 @@
       let field = null;
       let ordered = [];
       console.log('roleAssigned:', ordered);
-      // 신분 및 자리 배정 결과(원형 테이블)
-      socket.on('roleAssigned', (ordered) => {
-        console.log('roleAssigned:', ordered, '내 소켓 id:', socket.id);
+
+      // 게임 화면 전체를 다시 그리는 함수
+      function renderGame() {
         const gameContent = document.getElementById('gameContent');
         if (!gameContent) return;
-        console.log('roleAssigned:', ordered);
-        const n = ordered.length;
-        const radius = 160;
-        let html = '<h1 style="text-align:center;">신분 및 자리 배정 결과</h1>';
-        html += '<div style="position:relative;width:400px;height:400px;margin:0 auto;background:#f5f5dc;border-radius:50%;box-shadow:0 2px 12px rgba(0,0,0,0.08);">';
-        ordered.forEach((p, i) => {
-          const angle = (2 * Math.PI * i) / n - Math.PI/2;
-          const x = 200 + radius * Math.cos(angle) - 60;
-          const y = 200 + radius * Math.sin(angle) - 40;
-          html += `<div style="position:absolute;left:${x}px;top:${y}px;width:120px;height:80px;text-align:center;background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.08);padding:0.5em 0.2em;display:flex;flex-direction:column;justify-content:center;align-items:center;">
-            <div style='font-weight:bold;font-size:1.1em;'>${p.role}</div>
-            <div style='margin:0.2em 0;'>${p.nickname}</div>
-            <div style='font-size:0.9em;color:#888;'>카드: ${p.card}</div>
-          </div>`;
-        });
-        html += '<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:1.3em;font-weight:bold;">달무티<br>테이블</div>';
-        html += '</div>';
+
+        let html = '';
+
+        // 1. 원탁 그리기
+        if (ordered && ordered.length > 0) {
+          const n = ordered.length;
+          const radius = 160;
+          html += '<div style="position:relative;width:400px;height:400px;margin:0 auto;background:#f5f5dc;border-radius:50%;box-shadow:0 2px 12px rgba(0,0,0,0.08);margin-bottom: 2em;">';
+          ordered.forEach((p, i) => {
+            const angle = (2 * Math.PI * i) / n - Math.PI / 2;
+            const x = 200 + radius * Math.cos(angle) - 60;
+            const y = 200 + radius * Math.sin(angle) - 40;
+            const isMyTurn = turnInfo && turnInfo.currentPlayer && turnInfo.currentPlayer.id === p.id;
+            const amI = p.id === socket.id;
+            let borderColor = 'transparent';
+            if (amI) borderColor = '#ff9800';
+            else if (isMyTurn) borderColor = '#4caf50';
+
+            html += `<div style="position:absolute;left:${x}px;top:${y}px;width:120px;height:80px;text-align:center;background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.08);padding:0.5em 0.2em;display:flex;flex-direction:column;justify-content:center;align-items:center;border: 3px solid ${borderColor}; transition: border-color 0.3s;">
+              <div style='font-weight:bold;font-size:1.1em;'>${p.role}</div>
+              <div style='margin:0.2em 0;'>${p.nickname}</div>
+              ${p.card ? `<div style='font-size:0.9em;color:#888;'>숫자: ${p.card}</div>` : ''}
+            </div>`;
+          });
+          html += '<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:1.3em;font-weight:bold;">달무티<br>테이블</div>';
+          html += '</div>';
+        }
+
+        // 2. 필드 (이전에 낸 카드)
+        if (field && field.cards) {
+          html += '<div style="text-align:center;margin:1em 0;font-size:1.1em">';
+          html += `<b>필드:</b> ${field.cards.map(c => c === 'J' ? '🃏' : c).join(' ')} (${field.count}장, 숫자 ${field.number} 이하만 가능)`;
+          html += '</div>';
+        }
+
+        // 3. 턴 정보
+        if (turnInfo && turnInfo.currentPlayer) {
+          html += `<div style="text-align:center;margin-bottom:1em;font-size:1.2em;">`;
+          if (turnInfo.currentPlayer.id === socket.id) {
+            html += '<div style="color:#4caf50;font-weight:bold;">🎯 당신의 차례입니다!</div>';
+          } else {
+            html += `현재 차례: <b>${turnInfo.currentPlayer.nickname}</b> (${turnInfo.currentPlayer.role})`;
+          }
+          html += '</div>';
+        }
+
+        // 4. 내 카드
+        if (myCards && myCards.length > 0) {
+          html += '<div style="margin-top:1em;border-top:1px solid #ccc;padding-top:1em;">';
+          html += '<h2 style="text-align:center;margin:0 0 1em 0;">내 카드</h2>';
+          html += '<div id="handArea" style="display:flex;flex-wrap:wrap;justify-content:center;gap:0.5em 0.3em;">';
+          myCards.forEach((card, i) => {
+            const isSelected = selected.includes(i);
+            html += `<div class="cardBtn" data-idx="${i}" style="width:48px;height:72px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:2px solid ${isSelected ? '#ff9800' : '#bdb76b'};border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.3em;font-weight:bold;box-shadow:0 1px 4px rgba(0,0,0,0.08);cursor:pointer; transition: all 0.2s;">${card === 'J' ? '🃏' : card}</div>`;
+          });
+          html += '</div>';
+          html += '<div style="text-align:center;margin-top:1.5em;">';
+          html += '<button id="submitBtn" style="padding:0.7em 2em;font-size:1.1em;margin-right:1em;">제출</button>';
+          html += '<button id="passBtn" style="padding:0.7em 2em;font-size:1.1em;">패스</button>';
+          html += '</div>';
+          html += '</div>';
+        }
+
         gameContent.innerHTML = html;
+
+        // 5. 카드에 이벤트 리스너 다시 연결
+        if (myCards && myCards.length > 0) {
+           // 카드 선택
+          document.querySelectorAll('.cardBtn').forEach(btn => {
+            btn.onclick = function() {
+              const idx = parseInt(this.getAttribute('data-idx'));
+              const clickedCard = myCards[idx];
+
+              if (selected.includes(idx)) { // 선택 해제
+                selected = selected.filter(i => i !== idx);
+              } else { // 새로 선택
+                if (selected.length === 0) {
+                  selected.push(idx);
+                } else {
+                  const firstCard = myCards[selected[0]];
+                  // 조커는 어떤 카드와도 함께 선택 가능
+                  if (clickedCard === 'J' || firstCard === 'J' || clickedCard === firstCard) {
+                    selected.push(idx);
+                  } else {
+                    alert('같은 숫자 또는 조커만 함께 선택할 수 있습니다.');
+                  }
+                }
+              }
+              renderGame();
+            };
+          });
+          // 제출 버튼
+          document.getElementById('submitBtn').onclick = function() {
+            if (turnInfo && turnInfo.currentPlayer.id !== socket.id) {
+              alert('아직 내 차례가 아닙니다!');
+              return;
+            }
+            if (selected.length === 0) {
+              alert('제출할 카드를 선택하세요.');
+              return;
+            }
+            const cardsToPlay = selected.map(i => myCards[i]);
+            socket.emit('playCards', cardsToPlay, (res) => {
+              if (res && !res.success) {
+                alert(res.message);
+              } else {
+                // 성공 시 선택 해제
+                selected = [];
+              }
+            });
+          };
+          // 패스 버튼
+          document.getElementById('passBtn').onclick = function() {
+            if (turnInfo && turnInfo.currentPlayer.id !== socket.id) {
+              alert('아직 내 차례가 아닙니다!');
+              return;
+            }
+            socket.emit('passTurn');
+          };
+        }
+      }
+
+      // 신분 및 자리 배정 결과
+      socket.on('roleAssigned', (newOrdered) => {
+        console.log('roleAssigned:', newOrdered);
+        ordered = newOrdered;
+        myIdx = ordered.findIndex(p => p.id === socket.id);
+        renderGame();
+
+        // 5초 후에 숫자 정보 지우고 다시 그리기
+        setTimeout(() => {
+          ordered.forEach(p => delete p.card);
+          renderGame();
+        }, 5000);
       });
 
       // 내 카드 표시 및 카드 제출/패스 UI
-      function renderHand() {
-        const gameContent = document.getElementById('gameContent');
-        if (!gameContent) return;
-        let html = '<h1 style="text-align:center;">내 카드</h1>';
-        if (field && field.cards) {
-          html += '<div style="text-align:center;margin-bottom:1em;">';
-          html += `<b>필드:</b> ${field.cards.map(c => c==='J'?'🃏':c).join(' ')} (${field.count}장, ${field.number} 이하만 가능)`;
-          html += '</div>';
-        }
-        html += '<div id="handArea" style="display:flex;flex-wrap:wrap;justify-content:center;gap:0.5em 0.3em;">';
-        myCards.forEach((card, i) => {
-          const isSelected = selected.includes(i);
-          html += `<div class="cardBtn" data-idx="${i}" style="width:48px;height:72px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:2px solid ${isSelected ? '#ff9800' : '#bdb76b'};border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.3em;font-weight:bold;box-shadow:0 1px 4px rgba(0,0,0,0.08);cursor:pointer;">${card === 'J' ? '🃏' : card}</div>`;
-        });
-        html += '</div>';
-        html += '<div style="text-align:center;margin-top:1.5em;">';
-        html += '<button id="submitBtn" style="padding:0.7em 2em;font-size:1.1em;margin-right:1em;">제출</button>';
-        html += '<button id="passBtn" style="padding:0.7em 2em;font-size:1.1em;">패스</button>';
-        html += '</div>';
-        gameContent.innerHTML = html;
-
-        // 카드 선택
-        document.querySelectorAll('.cardBtn').forEach(btn => {
-          btn.onclick = function() {
-            const idx = parseInt(this.getAttribute('data-idx'));
-            if (selected.length === 0) {
-              selected.push(idx);
-            } else {
-              const firstCard = myCards[selected[0]];
-              if (selected.includes(idx)) {
-                selected = selected.filter(i => i !== idx);
-              } else if (myCards[idx] === firstCard) {
-                selected.push(idx);
-              } else {
-                alert('같은 숫자만 여러 장 선택할 수 있습니다.');
-              }
-            }
-            renderHand();
-          };
-        });
-        // 제출 버튼
-        document.getElementById('submitBtn').onclick = function() {
-          if (turnInfo && turnInfo.turnIdx !== myIdx) {
-            alert('아직 내 차례가 아닙니다!');
-            return;
-          }
-          if (selected.length === 0) {
-            alert('제출할 카드를 선택하세요.');
-            return;
-          }
-          const cards = selected.map(i => myCards[i]);
-          socket.emit('playCards', cards, (res) => {
-            if (res && !res.success) {
-              alert(res.message);
-            }
-          });
-        };
-        // 패스 버튼
-        document.getElementById('passBtn').onclick = function() {
-          if (turnInfo && turnInfo.turnIdx !== myIdx) {
-            alert('아직 내 차례가 아닙니다!');
-            return;
-          }
-          socket.emit('passTurn');
-        };
-      }
       socket.on('dealCards', (cards) => {
-        myCards = cards;
+        myCards = cards.sort((a,b) => (a==='J' ? 13 : a) - (b==='J' ? 13 : b));
         selected = [];
-        renderHand();
+        renderGame();
       });
-
-      // 턴 정보, 제출/패스 결과, 새 라운드 등은 필요에 따라 추가 구현
-      // ... (이전 index.html의 게임 관련 socket.on 이벤트를 참고해 추가 구현 가능) ...
 
       // 게임 시작 알림
       socket.on('gameStarted', (data) => {
         console.log('게임 시작:', data);
         turnInfo = data;
-        myIdx = ordered.findIndex(p => p.id === socket.id);
-        
-        const gameContent = document.getElementById('gameContent');
-        if (!gameContent) return;
-        
-        let html = '<h1 style="text-align:center;">게임 시작!</h1>';
-        html += `<div style="text-align:center;margin-bottom:1em;font-size:1.2em;">`;
-        html += `현재 차례: <b>${data.currentPlayer.nickname}</b> (${data.currentPlayer.role})`;
-        html += '</div>';
-        
-        if (data.currentPlayer.id === socket.id) {
-          html += '<div style="text-align:center;color:#4caf50;font-weight:bold;margin-bottom:1em;">🎯 당신의 차례입니다!</div>';
-        }
-        
-        gameContent.innerHTML = html;
-        renderHand();
+        renderGame();
       });
 
       // 차례 변경 알림
       socket.on('turnChanged', (data) => {
         console.log('차례 변경:', data);
         turnInfo = data;
-        
-        const gameContent = document.getElementById('gameContent');
-        if (!gameContent) return;
-        
-        let html = '<h1 style="text-align:center;">차례 변경</h1>';
-        html += `<div style="text-align:center;margin-bottom:1em;font-size:1.2em;">`;
-        html += `현재 차례: <b>${data.currentPlayer.nickname}</b> (${data.currentPlayer.role})`;
-        html += '</div>';
-        
-        if (data.currentPlayer.id === socket.id) {
-          html += '<div style="text-align:center;color:#4caf50;font-weight:bold;margin-bottom:1em;">🎯 당신의 차례입니다!</div>';
-        }
-        
-        gameContent.innerHTML = html;
-        renderHand();
+        renderGame();
       });
 
       // 카드 제출 결과
@@ -210,23 +228,27 @@
         console.log('카드 제출 결과:', data);
         const player = ordered[data.playerIdx];
         const cards = data.cards.map(c => c === 'J' ? '🃏' : c).join(' ');
-        
+
         // 필드 정보 업데이트
         if (data.lastPlay) {
-          field = {
-            cards: data.cards,
-            count: data.lastPlay.count,
-            number: data.lastPlay.number
-          };
+          field = { ...data.lastPlay };
+        }
+
+        // 내가 낸 카드면 손에서 제거
+        if (player.id === socket.id) {
+          data.cards.forEach(card => {
+            const index = myCards.indexOf(card);
+            if (index > -1) myCards.splice(index, 1);
+          });
         }
         
         // 완주한 플레이어 체크
         if (data.finished[data.playerIdx]) {
           appendChat(`🏁 ${player.nickname}님이 완주했습니다!`, false);
         }
-        
+
         appendChat(`🎴 ${player.nickname}님이 ${cards}를 냈습니다.`, false);
-        renderHand();
+        renderGame();
       });
 
       // 패스 결과
@@ -241,80 +263,57 @@
         console.log('새 라운드:', data);
         turnInfo = data;
         field = null; // 필드 초기화
-        
-        const gameContent = document.getElementById('gameContent');
-        if (!gameContent) return;
-        
-        let html = '<h1 style="text-align:center;">새 라운드 시작!</h1>';
-        html += `<div style="text-align:center;margin-bottom:1em;font-size:1.2em;">`;
-        html += `시작: <b>${data.currentPlayer.nickname}</b> (${data.currentPlayer.role})`;
-        html += '</div>';
-        
-        if (data.currentPlayer.id === socket.id) {
-          html += '<div style="text-align:center;color:#4caf50;font-weight:bold;margin-bottom:1em;">🎯 당신의 차례입니다!</div>';
-        }
-        
-        gameContent.innerHTML = html;
-        renderHand();
+        appendChat('🔄 새로운 라운드가 시작됩니다!', false);
+        renderGame();
       });
 
       // 게임 종료 및 점수
       socket.on('gameEnd', (result) => {
         console.log('게임 종료:', result);
-        
+
         const gameContent = document.getElementById('gameContent');
         if (!gameContent) return;
-        
+
         let html = '<h1 style="text-align:center;">게임 종료!</h1>';
         html += '<div style="text-align:center;margin-bottom:2em;">';
         html += '<h2>🏆 완주 순서</h2>';
         result.forEach((player, i) => {
           const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🏅';
           html += `<div style="margin:0.5em 0;font-size:1.1em;">`;
-          html += `${medal} ${i+1}위: ${player.nickname} (${player.role}) - ${player.score}점 (총점: ${player.total}점)`;
+          html += `${medal} ${i + 1}위: ${player.nickname} (${player.role}) - ${player.score}점 (총점: ${player.total}점)`;
           html += '</div>';
         });
         html += '</div>';
-        
+        html += '<p style="text-align:center;">잠시 후 다음 게임을 시작합니다...</p>';
         gameContent.innerHTML = html;
-        
-        // 채팅에도 결과 알림
+
         appendChat('🎉 게임이 종료되었습니다!', false);
-        result.forEach((player, i) => {
-          const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🏅';
-          appendChat(`${medal} ${i+1}위: ${player.nickname} (${player.role}) - ${player.score}점`, false);
-        });
       });
 
       // 최종 결과 (5판 완료)
       socket.on('finalResult', (result) => {
         console.log('최종 결과:', result);
-        
+
         const gameContent = document.getElementById('gameContent');
         if (!gameContent) return;
-        
+
         let html = '<h1 style="text-align:center;">🎊 최종 결과 🎊</h1>';
         html += '<div style="text-align:center;margin-bottom:2em;">';
         html += '<h2>🏆 최종 우승자</h2>';
         result.forEach((player, i) => {
           const medal = i === 0 ? '👑' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🏅';
           html += `<div style="margin:0.5em 0;font-size:1.1em;">`;
-          html += `${medal} ${i+1}위: ${player.nickname} - ${player.score}점`;
+          html += `${medal} ${i + 1}위: ${player.nickname} - ${player.score}점`;
           html += '</div>';
         });
         html += '</div>';
         html += '<div style="text-align:center;">';
-        html += '<button onclick="location.reload()" style="padding:1em 2em;font-size:1.2em;background:#4caf50;color:white;border:none;border-radius:8px;cursor:pointer;">새 게임 시작</button>';
+        html += '<button onclick="window.location.href=\'/lobby.html\'" style="padding:1em 2em;font-size:1.2em;background:#4caf50;color:white;border:none;border-radius:8px;cursor:pointer;">로비로 돌아가기</button>';
         html += '</div>';
-        
+
         gameContent.innerHTML = html;
-        
-        // 채팅에도 최종 결과 알림
+
         appendChat('🎊 5판 완료! 최종 결과입니다!', false);
-        result.forEach((player, i) => {
-          const medal = i === 0 ? '👑' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🏅';
-          appendChat(`${medal} ${i+1}위: ${player.nickname} - ${player.score}점`, false);
-        });
       });
 
       // 채팅 기능
@@ -338,9 +337,17 @@
         appendChat(`나: ${msg}`, true);
         chatInput.value = '';
       }
-      socket.on('chat', (msg) => {
-        console.log('chat:', msg, '내 소켓 id:', socket.id);
-        appendChat(`${nickname}: ${msg}`);
+      socket.on('chat', (data) => {
+        // 'data'가 객체일 경우를 처리 (서버에서 {nickname, msg} 형태로 보냄)
+        if (typeof data === 'object' && data.nickname && data.msg) {
+            // 내가 보낸 메시지는 이미 화면에 표시했으므로, 다른 사람 메시지만 추가
+            if (data.nickname !== nickname) {
+                appendChat(`${data.nickname}: ${data.msg}`, false);
+            }
+        } else if (typeof data === 'string') { 
+            // 이전 버전 호환성 (문자열만 오는 경우)
+            appendChat(data, false);
+        }
       });
 
       // 1~12 중 6개 숫자 중 내 숫자 보여주기
