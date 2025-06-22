@@ -32,17 +32,24 @@
   </div>
   <script src="/socket.io/socket.io.js"></script>
   <script>
+    console.log('game.html loaded');
     document.addEventListener('DOMContentLoaded', function() {
       const nickname = localStorage.getItem('dalmuti_nickname');
-      if (!nickname) window.location.href = '/join.html';
+      if (!nickname) window.location.href = '/index.html';
 
       const socket = io();
+      socket.on('connect', () => {
+        console.log('socket connected! id:', socket.id);
+      });
+      socket.on('roleAssigned', (ordered) => {
+        console.log('roleAssigned:', ordered, '내 소켓 id:', socket.id);
+      });
 
       // ★ 서버에 닉네임을 알림
       socket.emit('join', nickname, (res) => {
         if (!res.success && res.message !== '중복 닉네임') {
           alert(res.message);
-          window.location.href = '/join.html';
+          window.location.href = '/index.html';
         }
       });
 
@@ -52,11 +59,14 @@
       let myIdx = null;
       let turnInfo = null;
       let field = null;
-
+      let ordered = [];
+      console.log('roleAssigned:', ordered);
       // 신분 및 자리 배정 결과(원형 테이블)
       socket.on('roleAssigned', (ordered) => {
+        console.log('roleAssigned:', ordered, '내 소켓 id:', socket.id);
         const gameContent = document.getElementById('gameContent');
         if (!gameContent) return;
+        console.log('roleAssigned:', ordered);
         const n = ordered.length;
         const radius = 160;
         let html = '<h1 style="text-align:center;">신분 및 자리 배정 결과</h1>';
@@ -152,6 +162,161 @@
       // 턴 정보, 제출/패스 결과, 새 라운드 등은 필요에 따라 추가 구현
       // ... (이전 index.html의 게임 관련 socket.on 이벤트를 참고해 추가 구현 가능) ...
 
+      // 게임 시작 알림
+      socket.on('gameStarted', (data) => {
+        console.log('게임 시작:', data);
+        turnInfo = data;
+        myIdx = ordered.findIndex(p => p.id === socket.id);
+        
+        const gameContent = document.getElementById('gameContent');
+        if (!gameContent) return;
+        
+        let html = '<h1 style="text-align:center;">게임 시작!</h1>';
+        html += `<div style="text-align:center;margin-bottom:1em;font-size:1.2em;">`;
+        html += `현재 차례: <b>${data.currentPlayer.nickname}</b> (${data.currentPlayer.role})`;
+        html += '</div>';
+        
+        if (data.currentPlayer.id === socket.id) {
+          html += '<div style="text-align:center;color:#4caf50;font-weight:bold;margin-bottom:1em;">🎯 당신의 차례입니다!</div>';
+        }
+        
+        gameContent.innerHTML = html;
+        renderHand();
+      });
+
+      // 차례 변경 알림
+      socket.on('turnChanged', (data) => {
+        console.log('차례 변경:', data);
+        turnInfo = data;
+        
+        const gameContent = document.getElementById('gameContent');
+        if (!gameContent) return;
+        
+        let html = '<h1 style="text-align:center;">차례 변경</h1>';
+        html += `<div style="text-align:center;margin-bottom:1em;font-size:1.2em;">`;
+        html += `현재 차례: <b>${data.currentPlayer.nickname}</b> (${data.currentPlayer.role})`;
+        html += '</div>';
+        
+        if (data.currentPlayer.id === socket.id) {
+          html += '<div style="text-align:center;color:#4caf50;font-weight:bold;margin-bottom:1em;">🎯 당신의 차례입니다!</div>';
+        }
+        
+        gameContent.innerHTML = html;
+        renderHand();
+      });
+
+      // 카드 제출 결과
+      socket.on('playResult', (data) => {
+        console.log('카드 제출 결과:', data);
+        const player = ordered[data.playerIdx];
+        const cards = data.cards.map(c => c === 'J' ? '🃏' : c).join(' ');
+        
+        // 필드 정보 업데이트
+        if (data.lastPlay) {
+          field = {
+            cards: data.cards,
+            count: data.lastPlay.count,
+            number: data.lastPlay.number
+          };
+        }
+        
+        // 완주한 플레이어 체크
+        if (data.finished[data.playerIdx]) {
+          appendChat(`🏁 ${player.nickname}님이 완주했습니다!`, false);
+        }
+        
+        appendChat(`🎴 ${player.nickname}님이 ${cards}를 냈습니다.`, false);
+        renderHand();
+      });
+
+      // 패스 결과
+      socket.on('passResult', (data) => {
+        console.log('패스 결과:', data);
+        const player = ordered[data.playerIdx];
+        appendChat(`⏭️ ${player.nickname}님이 패스했습니다. (${data.passes}번째 패스)`, false);
+      });
+
+      // 새로운 라운드 시작
+      socket.on('newRound', (data) => {
+        console.log('새 라운드:', data);
+        turnInfo = data;
+        field = null; // 필드 초기화
+        
+        const gameContent = document.getElementById('gameContent');
+        if (!gameContent) return;
+        
+        let html = '<h1 style="text-align:center;">새 라운드 시작!</h1>';
+        html += `<div style="text-align:center;margin-bottom:1em;font-size:1.2em;">`;
+        html += `시작: <b>${data.currentPlayer.nickname}</b> (${data.currentPlayer.role})`;
+        html += '</div>';
+        
+        if (data.currentPlayer.id === socket.id) {
+          html += '<div style="text-align:center;color:#4caf50;font-weight:bold;margin-bottom:1em;">🎯 당신의 차례입니다!</div>';
+        }
+        
+        gameContent.innerHTML = html;
+        renderHand();
+      });
+
+      // 게임 종료 및 점수
+      socket.on('gameEnd', (result) => {
+        console.log('게임 종료:', result);
+        
+        const gameContent = document.getElementById('gameContent');
+        if (!gameContent) return;
+        
+        let html = '<h1 style="text-align:center;">게임 종료!</h1>';
+        html += '<div style="text-align:center;margin-bottom:2em;">';
+        html += '<h2>🏆 완주 순서</h2>';
+        result.forEach((player, i) => {
+          const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🏅';
+          html += `<div style="margin:0.5em 0;font-size:1.1em;">`;
+          html += `${medal} ${i+1}위: ${player.nickname} (${player.role}) - ${player.score}점 (총점: ${player.total}점)`;
+          html += '</div>';
+        });
+        html += '</div>';
+        
+        gameContent.innerHTML = html;
+        
+        // 채팅에도 결과 알림
+        appendChat('🎉 게임이 종료되었습니다!', false);
+        result.forEach((player, i) => {
+          const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🏅';
+          appendChat(`${medal} ${i+1}위: ${player.nickname} (${player.role}) - ${player.score}점`, false);
+        });
+      });
+
+      // 최종 결과 (5판 완료)
+      socket.on('finalResult', (result) => {
+        console.log('최종 결과:', result);
+        
+        const gameContent = document.getElementById('gameContent');
+        if (!gameContent) return;
+        
+        let html = '<h1 style="text-align:center;">🎊 최종 결과 🎊</h1>';
+        html += '<div style="text-align:center;margin-bottom:2em;">';
+        html += '<h2>🏆 최종 우승자</h2>';
+        result.forEach((player, i) => {
+          const medal = i === 0 ? '👑' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🏅';
+          html += `<div style="margin:0.5em 0;font-size:1.1em;">`;
+          html += `${medal} ${i+1}위: ${player.nickname} - ${player.score}점`;
+          html += '</div>';
+        });
+        html += '</div>';
+        html += '<div style="text-align:center;">';
+        html += '<button onclick="location.reload()" style="padding:1em 2em;font-size:1.2em;background:#4caf50;color:white;border:none;border-radius:8px;cursor:pointer;">새 게임 시작</button>';
+        html += '</div>';
+        
+        gameContent.innerHTML = html;
+        
+        // 채팅에도 최종 결과 알림
+        appendChat('🎊 5판 완료! 최종 결과입니다!', false);
+        result.forEach((player, i) => {
+          const medal = i === 0 ? '👑' : i === 1 ? '🥈' : i === 2 ? '🥉' : '🏅';
+          appendChat(`${medal} ${i+1}위: ${player.nickname} - ${player.score}점`, false);
+        });
+      });
+
       // 채팅 기능
       const chatMessages = document.getElementById('chatMessages');
       const chatInput = document.getElementById('chatInput');
@@ -173,7 +338,8 @@
         appendChat(`나: ${msg}`, true);
         chatInput.value = '';
       }
-      socket.on('chat', ({nickname, msg}) => {
+      socket.on('chat', (msg) => {
+        console.log('chat:', msg, '내 소켓 id:', socket.id);
         appendChat(`${nickname}: ${msg}`);
       });
 
@@ -182,10 +348,21 @@
         const gameContent = document.getElementById('gameContent');
         if (!gameContent) return;
         gameContent.innerHTML = `<div style="text-align:center;font-size:2em;margin-top:2em;">당신의 숫자: <b>${num}</b></div>`;
-        setTimeout(() => {
-          gameContent.innerHTML = '<div style="text-align:center;">게임이 곧 시작됩니다...</div>';
-        }, 5000);
       });
+
+      function startGameIfReady() {
+        // ... 기존 코드 ...
+        if (players.length > 1 && players.length <= MAX_PLAYERS && players.every(p => p.ready)) {
+          // ... 기존 코드 ...
+          // 신분 배정
+          let picked = players.map((p, i) => ({ id: p.id, nickname: p.nickname, card: numbers[i] }));
+          const roles = ['달무티', '대주교', '평민', '평민', '광부', '노예'];
+          picked.sort((a, b) => a.card - b.card);
+          ordered = picked.map((p, i) => ({ ...p, role: roles[i] }));
+          io.emit('roleAssigned', ordered);
+          // 이후 게임 로직에서 ordered 사용
+        }
+      }
     });
   </script>
 </body>

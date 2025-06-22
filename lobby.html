@@ -38,12 +38,12 @@
   <script>
     const socket = io();
     const nickname = localStorage.getItem('dalmuti_nickname');
-    if (!nickname) window.location.href = '/join.html';
+    if (!nickname) window.location.href = '/index.html';
 
     socket.emit('join', nickname, (res) => {
       if (!res.success && res.message !== '중복 닉네임') {
         alert(res.message);
-        window.location.href = '/join.html';
+        window.location.href = '/index.html';
       }
     });
 
