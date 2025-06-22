@@ -53,9 +53,8 @@ function startGameIfReady() {
   if (gameInProgress) return; // 이미 게임이 시작되었다면 중복 실행 방지
 
   if (players.length > 1 && players.length <= MAX_PLAYERS && players.every(p => p.ready)) {
-    console.log('게임 시작 조건 충족!');
+    console.log('게임 시작 조건 충족! 데이터 준비 중...');
     gameInProgress = true;
-    io.emit('gameStart');
     
     // 1. 숫자 뽑기
     const numbers = [];
@@ -110,31 +109,51 @@ function startGameIfReady() {
     
     playerHands = hands.map(h => h.slice());
 
-    // 5. 각 플레이어에게 통합된 게임 시작 정보 전송
-    ordered.forEach((p, i) => {
-      io.to(p.id).emit('gameSetup', {
-        ordered: ordered,
-        myCards: playerHands[i],
-        turnInfo: { turnIdx: 0, currentPlayer: ordered[0] },
-        field: null
-      });
-    });
-    console.log('Game setup data sent to all players.');
+    // 5. 클라이언트들에게 게임 페이지로 이동하라고 알림
+    io.emit('gameStart');
+    console.log('gameStart 이벤트 전송. 클라이언트들이 game.html로 이동합니다.');
   }
 }
 
 io.on('connection', (socket) => {
-  // --- 입장, 준비, 채팅 등 로비 로직 ---
   socket.on('join', (nickname, callback) => {
-    if (players.find(p => p.nickname === nickname)) {
-       // 재접속 처리 등 추가 가능
-    }
-    if (players.length >= MAX_PLAYERS) {
-      return callback({ success: false, message: '최대 인원 초과' });
-    }
-    const player = { id: socket.id, nickname, ready: false };
-    players.push(player);
     socket.nickname = nickname;
+
+    // --- 게임 재접속 및 데이터 전송 로직 ---
+    if (gameInProgress) {
+      const playerIndex = ordered.findIndex(p => p.nickname === nickname);
+      if (playerIndex !== -1) {
+        console.log(`게임 참가자 ${nickname}가 game.html에 연결했습니다.`);
+        
+        // 새로운 소켓 ID로 플레이어 정보 업데이트
+        ordered[playerIndex].id = socket.id;
+        const playerInLobbyList = players.find(p => p.nickname === nickname);
+        if (playerInLobbyList) playerInLobbyList.id = socket.id;
+
+        // 해당 플레이어에게 게임 데이터 전송
+        io.to(socket.id).emit('gameSetup', {
+          ordered: ordered,
+          myCards: playerHands[playerIndex],
+          turnInfo: { turnIdx: 0, currentPlayer: ordered[0] },
+          field: null
+        });
+        console.log(`${nickname}에게 gameSetup 데이터 전송 완료.`);
+        return callback({ success: true, inGame: true });
+      }
+    }
+
+    // --- 로비 입장 로직 ---
+    // 중복 닉네임 처리 (이미 로비에 있는 경우 소켓 ID만 업데이트)
+    const existingPlayer = players.find(p => p.nickname === nickname);
+    if (existingPlayer) {
+      existingPlayer.id = socket.id;
+    } else {
+      if (players.length >= MAX_PLAYERS) {
+        return callback({ success: false, message: '최대 인원 초과' });
+      }
+      players.push({ id: socket.id, nickname, ready: false });
+    }
+    
     io.emit('players', players);
     callback({ success: true });
   });
