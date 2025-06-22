@@ -79,7 +79,7 @@ function startGameIfReady() {
     lastGameScores = Array(ordered.length).fill(0);
     totalScores = Array(ordered.length).fill(0);
 
-    // 4. 카드 분배
+    // 4. 카드 분배 및 저장
     const deck = [];
     for (let i = 1; i <= 12; i++) {
       for (let j = 0; j < i; j++) deck.push(i);
@@ -91,23 +91,31 @@ function startGameIfReady() {
       [deck[i], deck[j]] = [deck[j], deck[i]];
     }
     
+    // 올바른 카드 분배: 각 플레이어에게 13장씩
     const hands = Array(ordered.length).fill(0).map(_ => []);
-    const cardsPerPlayer = Math.floor(80 / ordered.length);
-    let cardIdx = 0;
+    const cardsPerPlayer = 13;
+    
+    // 각 플레이어에게 13장씩 분배
     for (let i = 0; i < ordered.length; i++) {
       for (let j = 0; j < cardsPerPlayer; j++) {
-          hands[i].push(deck[cardIdx++]);
-      }
-    }
-    // 남은 카드는 달무티에게
-    const dalmutiIdx = ordered.findIndex(p => p.role === '달무티');
-    if (dalmutiIdx !== -1) {
-      while(cardIdx < deck.length) {
-        hands[dalmutiIdx].push(deck[cardIdx++]);
+        hands[i].push(deck[i * cardsPerPlayer + j]);
       }
     }
     
+    // 남은 카드(2장)는 달무티에게
+    const dalmutiIdx = ordered.findIndex(p => p.role === '달무티');
+    if (dalmutiIdx !== -1) {
+      const remainingCards = deck.slice(ordered.length * cardsPerPlayer);
+      hands[dalmutiIdx].push(...remainingCards);
+    }
+    
     playerHands = hands.map(h => h.slice());
+    
+    // 디버그: 각 플레이어의 카드 수 확인
+    console.log('카드 분배 완료:');
+    ordered.forEach((p, i) => {
+      console.log(`${p.nickname} (${p.role}): ${playerHands[i].length}장`);
+    });
 
     // 5. 클라이언트들에게 게임 페이지로 이동하라고 알림
     io.emit('gameStart');
@@ -225,9 +233,11 @@ io.on('connection', (socket) => {
     cb && cb({success: true});
 
     // 게임 종료 체크
-    if (finished.filter(f => f).length >= players.length - 1) {
-      const lastPlayerIdx = finished.findIndex(f => !f);
-      if(lastPlayerIdx !== -1) finishOrder.push(lastPlayerIdx);
+    const finishedCount = finished.filter(f => f).length;
+    console.log(`게임 진행 상황: ${finishedCount}/${players.length} 완주`);
+    
+    if (finishedCount >= players.length) { // 모든 플레이어가 완주했을 때만 게임 종료
+      console.log('모든 플레이어가 완주했습니다! 게임 종료.');
       
       const scores = [10, 8, 6, 5, 4, 3].slice(0, players.length);
       const result = finishOrder.map((playerIdx, i) => {
@@ -241,6 +251,7 @@ io.on('connection', (socket) => {
         }
       });
       
+      console.log('게임 종료! 최종 결과:', result);
       io.emit('gameEnd', result);
       
       gameInProgress = false; // 한 판 종료
