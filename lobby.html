@@ -36,7 +36,7 @@
   </div>
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    const socket = io();
+    const socket = io("https://simple-dalmuti.onrender.com");
     const nickname = localStorage.getItem('dalmuti_nickname');
     if (!nickname) window.location.href = '/index.html';
 

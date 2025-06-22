@@ -37,7 +37,7 @@
       const nickname = localStorage.getItem('dalmuti_nickname');
       if (!nickname) window.location.href = '/index.html';
 
-      const socket = io();
+      const socket = io("https://simple-dalmuti.onrender.com");
       socket.on('connect', () => {
         console.log('socket connected! id:', socket.id);
       });

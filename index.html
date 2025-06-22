@@ -23,7 +23,7 @@
   </div>
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    const socket = io();
+    const socket = io("https://simple-dalmuti.onrender.com");
     document.getElementById('nicknameForm').addEventListener('submit', function(e) {
       e.preventDefault();
       const nickname = document.getElementById('nickname').value.trim();
