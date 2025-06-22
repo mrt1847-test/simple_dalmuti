@@ -75,42 +75,45 @@ function startGameIfReady() {
     passes = 0;
     finished = Array(ordered.length).fill(false);
     finishOrder = [];
-    gameCount = 1;
-    lastGameScores = Array(ordered.length).fill(0);
-    totalScores = Array(ordered.length).fill(0);
+    // gameCount, lastGameScores, totalScores는 게임이 완전히 끝날 때 초기화하거나 다음 라운드 시작 시 해야 함
 
     // 4. 카드 분배 및 저장
     const deck = [];
     for (let i = 1; i <= 12; i++) {
       for (let j = 0; j < i; j++) deck.push(i);
     }
-    deck.push('J', 'J'); // 조커 2장
+    deck.push('J', 'J');
 
     for (let i = deck.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [deck[i], deck[j]] = [deck[j], deck[i]];
     }
     
-    // 올바른 카드 분배: 각 플레이어에게 13장씩
-    const hands = Array(ordered.length).fill(0).map(_ => []);
-    const cardsPerPlayer = 13;
+    const hands = Array(ordered.length).fill(null).map(() => []);
+    let cardDealIndex = 0;
     
-    // 각 플레이어에게 13장씩 분배
-    for (let i = 0; i < ordered.length; i++) {
-      for (let j = 0; j < cardsPerPlayer; j++) {
-        hands[i].push(deck[i * cardsPerPlayer + j]);
+    // 13장씩 라운드-로빈 방식으로 분배
+    for (let i = 0; i < 13; i++) {
+      for (let j = 0; j < ordered.length; j++) {
+        if(deck[cardDealIndex]) {
+          hands[j].push(deck[cardDealIndex++]);
+        }
+      }
+    }
+
+    const dalmutiIdx = ordered.findIndex(p => p.role === '달무티');
+    if (dalmutiIdx !== -1) {
+      while(cardDealIndex < deck.length) {
+        if(deck[cardDealIndex]) {
+          hands[dalmutiIdx].push(deck[cardDealIndex++]);
+        } else {
+          cardDealIndex++; // 만약을 대비한 무한 루프 방지
+        }
       }
     }
     
-    // 남은 카드(2장)는 달무티에게
-    const dalmutiIdx = ordered.findIndex(p => p.role === '달무티');
-    if (dalmutiIdx !== -1) {
-      const remainingCards = deck.slice(ordered.length * cardsPerPlayer);
-      hands[dalmutiIdx].push(...remainingCards);
-    }
-    
-    playerHands = hands.map(h => h.slice());
-    
+    playerHands = hands; // 더 이상 map, slice 필요 없음. 위에서부터 격리됨.
+
     // 디버그: 각 플레이어의 카드 수 확인
     console.log('카드 분배 완료:');
     ordered.forEach((p, i) => {
@@ -197,8 +200,17 @@ io.on('connection', (socket) => {
       return cb && cb({success: false, message: '당신의 차례가 아니거나, 게임이 진행중이 아닙니다.'});
     }
     
-    // 유효성 검사
+    // 유효성 검사 (중복 카드 제출 방지)
     const hand = playerHands[idx];
+    const handCounts = hand.reduce((acc, c) => ({...acc, [c]: (acc[c] || 0) + 1 }), {});
+    const playedCounts = cards.reduce((acc, c) => ({...acc, [c]: (acc[c] || 0) + 1 }), {});
+
+    for(const card in playedCounts) {
+      if(!handCounts[card] || handCounts[card] < playedCounts[card]) {
+        return cb && cb({success: false, message: '손에 없는 카드를 제출했습니다.'});
+      }
+    }
+    
     let num = null;
     let jokerCount = cards.filter(c => c === 'J').length;
     
@@ -220,7 +232,12 @@ io.on('connection', (socket) => {
     }
     
     // 제출 처리
-    cards.forEach(c => hand.splice(hand.indexOf(c), 1));
+    cards.forEach(c => {
+      const cardIndexToRemove = hand.indexOf(c);
+      if (cardIndexToRemove > -1) {
+        hand.splice(cardIndexToRemove, 1);
+      }
+    });
     lastPlay = {count: cards.length, number: num, playerIdx: idx};
     passes = 0;
     
