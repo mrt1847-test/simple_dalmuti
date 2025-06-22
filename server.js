@@ -196,12 +196,18 @@ io.on('connection', (socket) => {
   socket.on('playCards', (cards, cb) => {
     const idx = ordered.findIndex(p => p.id === socket.id);
 
-    if (!gameInProgress || idx !== turnIdx || finished[idx]) {
+    if (!gameInProgress || idx === -1 || finished[idx]) {
       return cb && cb({success: false, message: '당신의 차례가 아니거나, 게임이 진행중이 아닙니다.'});
     }
+
+    console.log(`\n--- [playCards] Event from ${ordered[idx].nickname} (idx: ${idx}) ---`);
+    console.log('Cards to play:', cards);
     
     // 유효성 검사 (중복 카드 제출 방지)
     const hand = playerHands[idx];
+    console.log(`Hand of ${ordered[idx].nickname} BEFORE play: ${hand.length} cards -> [${hand.join(',')}]`);
+    console.log('All hands BEFORE play:', JSON.stringify(playerHands.map(h => h.length)));
+
     const handCounts = hand.reduce((acc, c) => ({...acc, [c]: (acc[c] || 0) + 1 }), {});
     const playedCounts = cards.reduce((acc, c) => ({...acc, [c]: (acc[c] || 0) + 1 }), {});
 
@@ -240,11 +246,19 @@ io.on('connection', (socket) => {
     });
     lastPlay = {count: cards.length, number: num, playerIdx: idx};
     passes = 0;
+
+    console.log(`Hand of ${ordered[idx].nickname} AFTER play: ${hand.length} cards`);
+    console.log('All hands AFTER play:', JSON.stringify(playerHands.map(h => h.length)));
     
     if (hand.length === 0) {
-      finished[idx] = true;
-      finishOrder.push(idx);
+      if (!finished[idx]) {
+        finished[idx] = true;
+        finishOrder.push(idx);
+        console.log(`*** ${ordered[idx].nickname} has finished! ***`);
+      }
     }
+
+    console.log('`finished` array state:', JSON.stringify(finished));
     
     io.emit('playResult', {playerIdx: idx, cards, lastPlay, finished});
     cb && cb({success: true});
@@ -293,9 +307,17 @@ io.on('connection', (socket) => {
     
     passes++;
     io.emit('passResult', {playerIdx: idx, passes});
+
+    console.log(`\n--- [passTurn] Event from ${ordered[idx].nickname} (idx: ${idx}) ---`);
+    console.log(`Current passes: ${passes}`);
     
+    // 현재 게임에 참여 중인(완주하지 않은) 플레이어 수 계산
+    const activePlayersCount = players.length - finished.filter(f => f).length;
+    console.log(`Active players: ${activePlayersCount}`);
+
     // 모두 패스 -> 라운드 리셋
-    if (passes >= players.length - finished.filter(f => f).length - 1) {
+    if (passes >= activePlayersCount) {
+      console.log('*** All active players have passed. Starting a new round. ***');
       passes = 0;
       // 마지막으로 카드를 낸 사람이 턴을 잡음
       if (lastPlay) {
