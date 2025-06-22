@@ -88,11 +88,15 @@
       const msg = chatInput.value.trim();
       if (!msg) return;
       socket.emit('chat', msg);
-      appendChat(`나: ${msg}`, true);
       chatInput.value = '';
     }
-    socket.on('chat', ({nickname, msg}) => {
-      appendChat(`${nickname}: ${msg}`);
+    socket.on('chat', (data) => {
+      const nickname = localStorage.getItem('dalmuti_nickname');
+      if (typeof data === 'object' && data.nickname && data.msg) {
+          const isMine = data.nickname === nickname;
+          const prefix = isMine ? '나' : data.nickname;
+          appendChat(`${prefix}: ${data.msg}`, isMine);
+      }
     });
   </script>
 </body>

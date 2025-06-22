@@ -80,50 +80,46 @@ function startGameIfReady() {
     lastGameScores = Array(ordered.length).fill(0);
     totalScores = Array(ordered.length).fill(0);
 
-    // 4. 신분 배정 및 카드 분배 순차 실행
-    io.emit('roleAssigned', ordered);
-    console.log('roleAssigned emit:', ordered);
-            
-    // 5. 카드 분배
-    setTimeout(() => {
-      const deck = [];
-      for (let i = 1; i <= 12; i++) {
-        for (let j = 0; j < i; j++) deck.push(i);
-      }
-      deck.push('J', 'J'); // 조커 2장
+    // 4. 카드 분배
+    const deck = [];
+    for (let i = 1; i <= 12; i++) {
+      for (let j = 0; j < i; j++) deck.push(i);
+    }
+    deck.push('J', 'J'); // 조커 2장
 
-      for (let i = deck.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [deck[i], deck[j]] = [deck[j], deck[i]];
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    
+    const hands = Array(ordered.length).fill(0).map(_ => []);
+    const cardsPerPlayer = Math.floor(80 / ordered.length);
+    let cardIdx = 0;
+    for (let i = 0; i < ordered.length; i++) {
+      for (let j = 0; j < cardsPerPlayer; j++) {
+          hands[i].push(deck[cardIdx++]);
       }
-      
-      const hands = Array(ordered.length).fill(0).map(_ => []);
-      const cardsPerPlayer = Math.floor(80 / ordered.length);
-      let cardIdx = 0;
-      for (let i = 0; i < ordered.length; i++) {
-        for (let j = 0; j < cardsPerPlayer; j++) {
-           hands[i].push(deck[cardIdx++]);
-        }
-      }
-      // 남은 카드는 달무티에게
-      const dalmutiIdx = ordered.findIndex(p => p.role === '달무티');
+    }
+    // 남은 카드는 달무티에게
+    const dalmutiIdx = ordered.findIndex(p => p.role === '달무티');
+    if (dalmutiIdx !== -1) {
       while(cardIdx < deck.length) {
         hands[dalmutiIdx].push(deck[cardIdx++]);
       }
-      
-      playerHands = hands.map(h => h.slice());
-      
-      ordered.forEach((p, i) => {
-        io.to(p.id).emit('dealCards', hands[i]);
+    }
+    
+    playerHands = hands.map(h => h.slice());
+
+    // 5. 각 플레이어에게 통합된 게임 시작 정보 전송
+    ordered.forEach((p, i) => {
+      io.to(p.id).emit('gameSetup', {
+        ordered: ordered,
+        myCards: playerHands[i],
+        turnInfo: { turnIdx: 0, currentPlayer: ordered[0] },
+        field: null
       });
-      console.log('카드 분배 완료');
-      
-      // 6. 게임 시작!
-      setTimeout(() => {
-        io.emit('gameStarted', { turnIdx: 0, currentPlayer: ordered[0] });
-        console.log('게임 시작! 첫 번째 차례:', ordered[0].nickname);
-      }, 1000);
-    }, 3000); // roleAssigned 후 3초 뒤
+    });
+    console.log('Game setup data sent to all players.');
   }
 }
 
@@ -254,9 +250,12 @@ io.on('connection', (socket) => {
     // 모두 패스 -> 라운드 리셋
     if (passes >= players.length - finished.filter(f => f).length - 1) {
       passes = 0;
-      lastPlay = null;
       // 마지막으로 카드를 낸 사람이 턴을 잡음
-      turnIdx = lastPlay.playerIdx;
+      if (lastPlay) {
+        turnIdx = lastPlay.playerIdx;
+      }
+      // lastPlay가 null이면 (라운드 첫 턴에 모두 패스하는 비정상적 상황) 현재 턴 유지
+      lastPlay = null;
       io.emit('newRound', {turnIdx, lastPlay: null, currentPlayer: ordered[turnIdx]});
     } else {
       do {

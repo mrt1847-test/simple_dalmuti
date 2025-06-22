@@ -188,30 +188,50 @@
         }
       }
 
-      // 신분 및 자리 배정 결과
-      socket.on('roleAssigned', (newOrdered) => {
-        console.log('roleAssigned:', newOrdered);
-        ordered = newOrdered;
+      // 게임 초기 설정 이벤트 핸들러
+      socket.on('gameSetup', (data) => {
+        console.log('Game setup received:', data);
+        ordered = data.ordered;
+        myCards = data.myCards.sort((a,b) => (a==='J' ? 13 : a) - (b==='J' ? 13 : b));
+        turnInfo = data.turnInfo;
+        field = data.field;
         myIdx = ordered.findIndex(p => p.id === socket.id);
+        selected = [];
+        
         renderGame();
 
         // 5초 후에 숫자 정보 지우고 다시 그리기
         setTimeout(() => {
-          ordered.forEach(p => delete p.card);
-          renderGame();
+            if(ordered && ordered.length > 0) {
+              ordered.forEach(p => delete p.card);
+              renderGame();
+            }
         }, 5000);
       });
 
-      // 내 카드 표시 및 카드 제출/패스 UI
+      // 신분 및 자리 배정 결과 (다음 라운드용)
+      socket.on('roleAssigned', (newOrdered) => {
+        console.log('roleAssigned for next round:', newOrdered);
+        ordered = newOrdered;
+        myIdx = ordered.findIndex(p => p.id === socket.id);
+        // 다음 라운드를 위해 다른 상태 초기화
+        myCards = [];
+        selected = [];
+        turnInfo = null;
+        field = null;
+        renderGame();
+      });
+
+      // 내 카드 표시 (다음 라운드용)
       socket.on('dealCards', (cards) => {
         myCards = cards.sort((a,b) => (a==='J' ? 13 : a) - (b==='J' ? 13 : b));
         selected = [];
         renderGame();
       });
 
-      // 게임 시작 알림
+      // 게임 시작 알림 (다음 라운드용)
       socket.on('gameStarted', (data) => {
-        console.log('게임 시작:', data);
+        console.log('Game started for next round:', data);
         turnInfo = data;
         renderGame();
       });
@@ -330,46 +350,22 @@
       }
       chatSend.onclick = sendChat;
       chatInput.onkeydown = function(e) { if (e.key === 'Enter') sendChat(); };
+      
       function sendChat() {
         const msg = chatInput.value.trim();
         if (!msg) return;
-        socket.emit('chat', msg);
-        appendChat(`나: ${msg}`, true);
+        socket.emit('chat', msg); // 서버로 메시지 전송만 함
         chatInput.value = '';
       }
+
       socket.on('chat', (data) => {
-        // 'data'가 객체일 경우를 처리 (서버에서 {nickname, msg} 형태로 보냄)
+        // 서버로부터 받은 메시지를 화면에 표시
         if (typeof data === 'object' && data.nickname && data.msg) {
-            // 내가 보낸 메시지는 이미 화면에 표시했으므로, 다른 사람 메시지만 추가
-            if (data.nickname !== nickname) {
-                appendChat(`${data.nickname}: ${data.msg}`, false);
-            }
-        } else if (typeof data === 'string') { 
-            // 이전 버전 호환성 (문자열만 오는 경우)
-            appendChat(data, false);
+            const isMine = data.nickname === nickname;
+            const prefix = isMine ? '나' : data.nickname;
+            appendChat(`${prefix}: ${data.msg}`, isMine);
         }
       });
-
-      // 1~12 중 6개 숫자 중 내 숫자 보여주기
-      socket.on('showNumber', (num) => {
-        const gameContent = document.getElementById('gameContent');
-        if (!gameContent) return;
-        gameContent.innerHTML = `<div style="text-align:center;font-size:2em;margin-top:2em;">당신의 숫자: <b>${num}</b></div>`;
-      });
-
-      function startGameIfReady() {
-        // ... 기존 코드 ...
-        if (players.length > 1 && players.length <= MAX_PLAYERS && players.every(p => p.ready)) {
-          // ... 기존 코드 ...
-          // 신분 배정
-          let picked = players.map((p, i) => ({ id: p.id, nickname: p.nickname, card: numbers[i] }));
-          const roles = ['달무티', '대주교', '평민', '평민', '광부', '노예'];
-          picked.sort((a, b) => a.card - b.card);
-          ordered = picked.map((p, i) => ({ ...p, role: roles[i] }));
-          io.emit('roleAssigned', ordered);
-          // 이후 게임 로직에서 ordered 사용
-        }
-      }
     });
   </script>
 </body>
