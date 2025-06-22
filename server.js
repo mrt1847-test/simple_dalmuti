@@ -5,7 +5,12 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: {
+    origin: "*", // 모든 출처에서의 연결을 허용합니다.
+    methods: ["GET", "POST"]
+  }
+});
 
 const MAX_PLAYERS = 6;
 let players = [];
