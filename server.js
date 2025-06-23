@@ -83,12 +83,25 @@ function startGameIfReady() {
     }
     
     // 2. 신분 및 순서 배정
-    let picked = players.map((p, i) => ({ id: p.id, nickname: p.nickname, card: 0 }));
-    picked.forEach((p,i) => p.card = numbers[i]);
-    
+    let picked;
     const roles = ['달무티', '대주교', '평민', '평민', '광부', '노예'].slice(0, players.length);
-    picked.sort((a, b) => a.card - b.card);
-    game.ordered = picked.map((p, i) => ({ ...p, role: roles[i] }));
+    if (game.gameCount && game.gameCount > 1 && game.lastGameScores.length === players.length) {
+      // 두 번째 게임부터는 바로 전 게임 점수 높은 순으로 역할 배정
+      picked = players.map((p, i) => ({ id: p.id, nickname: p.nickname, score: game.lastGameScores[i] || 0 }));
+      picked.sort((a, b) => b.score - a.score); // 높은 점수 순
+      game.ordered = picked.map((p, i) => ({ ...p, role: roles[i] }));
+    } else {
+      // 첫 게임은 랜덤
+      picked = players.map((p, i) => ({ id: p.id, nickname: p.nickname, card: 0 }));
+      const numbers = [];
+      while (numbers.length < players.length) {
+        const n = Math.floor(Math.random() * 12) + 1;
+        if (!numbers.includes(n)) numbers.push(n);
+      }
+      picked.forEach((p,i) => p.card = numbers[i]);
+      picked.sort((a, b) => a.card - b.card);
+      game.ordered = picked.map((p, i) => ({ ...p, role: roles[i] }));
+    }
 
     // 3. 게임 상태 초기화
     game.turnIdx = 0;
@@ -323,7 +336,14 @@ io.on('connection', (socket) => {
       console.log('게임 종료! 최종 결과:', result);
       io.emit('gameEnd', result);
       
-      resetGame();
+      // 5초 후 자동으로 다음 게임 시작
+      setTimeout(() => {
+        resetGame();
+        // 모든 플레이어를 자동 ready 처리
+        players.forEach(p => p.ready = true);
+        io.emit('players', players);
+        startGameIfReady();
+      }, 5000);
       return;
     }
     
