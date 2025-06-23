@@ -94,8 +94,16 @@
           // 필드(이전에 낸 카드)를 테이블 중앙에 노출
           html += '<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:1.3em;font-weight:bold;text-align:center;">';
           if (field && field.number) {
-            html += `<div style=\"margin-top:0.7em;font-size:1.1em;background:#fffbe6;padding:0.5em 1.2em;border-radius:8px;border:1.5px solid #bdb76b;box-shadow:0 1px 4px rgba(0,0,0,0.08);display:inline-block;\">`;
-            html += `<b>필드:</b> 숫자 ${field.number} (${field.count}장)`;
+            html += '<div style="margin-top:0.7em;font-size:1.1em;text-align:center;">';
+            html += '<div style="margin-bottom:0.5em;font-weight:bold;">필드</div>';
+            html += '<div style="display:flex;justify-content:center;gap:10px;">';
+            for (let i = 0; i < field.count; i++) {
+              html += `<div style="width:80px;height:160px;background:#fffbe6;border:4px solid #bdb76b;box-shadow:-3px 0px 8px rgba(0,0,0,0.4);box-sizing:border-box;position:relative;border-radius:6px;">`;
+              html += `<div style="position:absolute;top:3px;left:3px;font-size:1em;font-weight:bold;">${field.number === 'J' ? '🃏' : field.number}</div>`;
+              html += '</div>';
+            }
+            html += '</div>';
+            html += `<div style="margin-top:0.5em;font-size:0.9em;color:#666;"><b>필드:</b> 숫자 ${field.number} (${field.count}장)</div>`;
             html += '</div>';
           }
           html += '</div>';
@@ -125,10 +133,10 @@
         if (myCards && myCards.length > 0) {
           html += '<div style="margin-top:1em;border-top:1px solid #ccc;padding-top:1em;">';
           html += '<h2 style="text-align:center;margin:0 0 1em 0;">내 카드</h2>';
-          html += '<div id="handArea" style="display:flex;max-width:1000px;background:#eee;padding:10px;box-sizing:border-box;margin:0 auto 10px auto;overflow:visible;">';
+          html += '<div id="handArea" style="display:flex;background:#eee;padding:10px;box-sizing:border-box;margin:0 auto 10px auto;overflow:visible;">';
           myCards.forEach((card, i) => {
             const isSelected = selected.includes(i);
-            html += `<div class="cardBtn" data-idx="${i}" style="overflow:visible;width:20px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''}">`;
+            html += `<div class="cardBtn" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''}">`;
             html += `<div style="width:100px;height:200px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:5px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;">`;
             html += `<div style="position:absolute;top:5px;left:5px;font-size:1.2em;font-weight:bold;">${card === 'J' ? '🃏' : card}</div>`;
             html += '</div>';
