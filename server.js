@@ -164,7 +164,7 @@ io.on('connection', (socket) => {
 
         // 해당 플레이어에게 게임 데이터 전송
         io.to(socket.id).emit('gameSetup', {
-          ordered: game.ordered,
+          ordered: game.ordered.map((p, i) => ({ ...p, cardCount: game.playerHands[i].length, finished: game.finished[i] })),
           myCards: game.playerHands[playerIndex],
           turnInfo: { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx] },
           field: game.lastPlay
@@ -286,7 +286,13 @@ io.on('connection', (socket) => {
 
     console.log('`finished` array state:', JSON.stringify(game.finished));
     
-    io.emit('playResult', {playerIdx: idx, cards, lastPlay: game.lastPlay, finished: game.finished});
+    io.emit('playResult', {
+      playerIdx: idx, 
+      cards, 
+      lastPlay: game.lastPlay, 
+      finished: game.finished,
+      playerHands: game.playerHands.map(hand => hand.length)
+    });
     cb && cb({success: true});
 
     // 게임 종료 체크
@@ -338,16 +344,27 @@ io.on('connection', (socket) => {
     console.log(`Active players: ${activePlayersCount}`);
 
     // 모두 패스 -> 라운드 리셋
-    if (game.passes >= activePlayersCount-1) {
+    // 플레이어가 1명만 남은 경우는 패스하지 않고 카드를 내야 함
+    if (game.passes >= activePlayersCount-1 && activePlayersCount > 1) {
       console.log('*** All active players have passed. Starting a new round. ***');
       game.passes = 0;
       // 마지막으로 카드를 낸 사람이 턴을 잡음
       if (game.lastPlay) {
         game.turnIdx = game.lastPlay.playerIdx;
+        // 마지막으로 카드를 낸 사람이 이미 완료했다면, 다음 완료하지 않은 플레이어에게 턴을 넘김
+        if (game.finished[game.turnIdx]) {
+          do {
+            game.turnIdx = (game.turnIdx + 1) % game.ordered.length;
+          } while (game.finished[game.turnIdx]);
+        }
       }
       // lastPlay가 null이면 (라운드 첫 턴에 모두 패스하는 비정상적 상황) 현재 턴 유지
       game.lastPlay = null;
       io.emit('newRound', {turnIdx: game.turnIdx, lastPlay: null, currentPlayer: game.ordered[game.turnIdx]});
+    } else if (activePlayersCount === 1) {
+      // 플레이어가 1명만 남은 경우, 패스할 수 없고 카드를 내야 함
+      console.log('*** Only one player remaining. Must play cards. ***');
+      // 패스 처리는 하지 않고 턴을 그대로 유지
     } else {
       do {
         game.turnIdx = (game.turnIdx + 1) % game.ordered.length;

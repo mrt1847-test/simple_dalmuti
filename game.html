@@ -87,6 +87,7 @@
             html += `<div style="position:absolute;left:${x}px;top:${y}px;width:120px;height:80px;text-align:center;background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.08);padding:0.5em 0.2em;display:flex;flex-direction:column;justify-content:center;align-items:center;border: 3px solid ${borderColor}; transition: border-color 0.3s;">
               <div style='font-weight:bold;font-size:1.1em;'>${p.role}</div>
               <div style='margin:0.2em 0;'>${p.nickname}</div>
+              <div style='font-size:0.9em;color:#666;'>카드 ${p.cardCount || 0}장</div>
               ${p.card ? `<div style='font-size:0.9em;color:#888;'>숫자: ${p.card}</div>` : ''}
             </div>`;
           });
@@ -95,9 +96,9 @@
         }
 
         // 2. 필드 (이전에 낸 카드)
-        if (field && field.cards) {
+        if (field && field.number) {
           html += '<div style="text-align:center;margin:1em 0;font-size:1.1em">';
-          html += `<b>필드:</b> ${field.cards.map(c => c === 'J' ? '🃏' : c).join(' ')} (${field.count}장, 숫자 ${field.number} 이하만 가능)`;
+          html += `<b>필드:</b> 숫자 ${field.number} (${field.count}장)`;
           html += '</div>';
         }
 
@@ -124,7 +125,14 @@
           html += '</div>';
           html += '<div style="text-align:center;margin-top:1.5em;">';
           html += '<button id="submitBtn" style="padding:0.7em 2em;font-size:1.1em;margin-right:1em;">제출</button>';
-          html += '<button id="passBtn" style="padding:0.7em 2em;font-size:1.1em;">패스</button>';
+          
+          // 마지막 플레이어가 남았는지 확인
+          const activePlayers = ordered.filter(p => !p.finished).length;
+          if (activePlayers > 1) {
+            html += '<button id="passBtn" style="padding:0.7em 2em;font-size:1.1em;">패스</button>';
+          } else {
+            html += '<button id="passBtn" style="padding:0.7em 2em;font-size:1.1em;background:#ccc;color:#666;cursor:not-allowed;" disabled>패스 불가</button>';
+          }
           html += '</div>';
           html += '</div>';
         }
@@ -252,6 +260,13 @@
         // 필드 정보 업데이트
         if (data.lastPlay) {
           field = { ...data.lastPlay };
+        }
+
+        // 각 플레이어의 카드 수 업데이트
+        if (data.playerHands) {
+          ordered.forEach((p, i) => {
+            p.cardCount = data.playerHands[i];
+          });
         }
 
         // 내가 낸 카드면 손에서 제거
