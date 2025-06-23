@@ -156,6 +156,15 @@ function startGameIfReady() {
 
     // 5. 클라이언트들에게 게임 페이지로 이동하라고 알림
     io.emit('gameStart');
+    // 바로 게임 세팅 데이터도 전송
+    game.ordered.forEach((p, i) => {
+      io.to(p.id).emit('gameSetup', {
+        ordered: game.ordered.map((p, i) => ({ ...p, cardCount: game.playerHands[i].length, finished: game.finished[i] })),
+        myCards: game.playerHands[i],
+        turnInfo: { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx] },
+        field: game.lastPlay
+      });
+    });
     console.log('gameStart 이벤트 전송. 클라이언트들이 game.html로 이동합니다.');
   }
 }
