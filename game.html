@@ -91,16 +91,24 @@
               ${p.card ? `<div style='font-size:0.9em;color:#888;'>숫자: ${p.card}</div>` : ''}
             </div>`;
           });
-          html += '<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:1.3em;font-weight:bold;">달무티<br>테이블</div>';
+          // 필드(이전에 낸 카드)를 테이블 중앙에 노출
+          html += '<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:1.3em;font-weight:bold;text-align:center;">';
+          if (field && field.number) {
+            html += `<div style=\"margin-top:0.7em;font-size:1.1em;background:#fffbe6;padding:0.5em 1.2em;border-radius:8px;border:1.5px solid #bdb76b;box-shadow:0 1px 4px rgba(0,0,0,0.08);display:inline-block;\">`;
+            html += `<b>필드:</b> 숫자 ${field.number} (${field.count}장)`;
+            html += '</div>';
+          }
+          html += '</div>';
           html += '</div>';
         }
 
         // 2. 필드 (이전에 낸 카드)
-        if (field && field.number) {
-          html += '<div style="text-align:center;margin:1em 0;font-size:1.1em">';
-          html += `<b>필드:</b> 숫자 ${field.number} (${field.count}장)`;
-          html += '</div>';
-        }
+        // 기존 중앙 표시 코드는 삭제 또는 주석처리
+        // if (field && field.number) {
+        //   html += '<div style="text-align:center;margin:1em 0;font-size:1.1em">';
+        //   html += `<b>필드:</b> 숫자 ${field.number} (${field.count}장)`;
+        //   html += '</div>';
+        // }
 
         // 3. 턴 정보
         if (turnInfo && turnInfo.currentPlayer) {
