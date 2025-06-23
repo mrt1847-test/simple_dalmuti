@@ -14,6 +14,40 @@
     #chatInput { flex: 1 1 auto; min-width: 0; border: none; padding: 0.7em; font-size: 1em; border-radius: 0 0 0 10px; }
     #chatSend { width: 56px; border: none; background: #8bc34a; color: #fff; font-size: 1em; border-radius: 0 0 10px 0; cursor: pointer; }
     #chatSend:hover { background: #689f38; }
+
+    /* 모바일 대응 */
+    @media (max-width: 768px) {
+      body { height: auto; min-height: 100vh; padding: 10px; }
+      #mainWrap { flex-direction: column; align-items: center; }
+      #gameArea { min-width: auto; width: 100%; max-width: 400px; }
+      #chatWrap { width: 100%; max-width: 400px; margin-left: 0; margin-top: 1em; height: 300px; }
+      
+      /* 원탁 크기 조정 */
+      #gameContent > div:first-child { width: 300px !important; height: 300px !important; }
+      #gameContent > div:first-child > div { width: 80px !important; height: 60px !important; font-size: 0.8em !important; }
+      
+      /* 카드 크기 조정 */
+      .cardBtn > div { width: 60px !important; height: 90px !important; font-size: 1.5em !important; }
+      
+      /* 필드 카드 크기 조정 */
+      #gameContent div[style*="width:80px;height:130px"] { width: 60px !important; height: 90px !important; }
+    }
+
+    /* 작은 모바일 대응 */
+    @media (max-width: 480px) {
+      #gameArea { max-width: 100%; }
+      #chatWrap { max-width: 100%; }
+      
+      /* 원탁 더 작게 */
+      #gameContent > div:first-child { width: 250px !important; height: 250px !important; }
+      #gameContent > div:first-child > div { width: 70px !important; height: 50px !important; font-size: 0.7em !important; }
+      
+      /* 카드 더 작게 */
+      .cardBtn > div { width: 50px !important; height: 75px !important; font-size: 1.2em !important; }
+      
+      /* 필드 카드 더 작게 */
+      #gameContent div[style*="width:80px;height:130px"] { width: 50px !important; height: 75px !important; }
+    }
   </style>
 </head>
 <body>
