@@ -125,10 +125,12 @@
         if (myCards && myCards.length > 0) {
           html += '<div style="margin-top:1em;border-top:1px solid #ccc;padding-top:1em;">';
           html += '<h2 style="text-align:center;margin:0 0 1em 0;">내 카드</h2>';
-          html += '<div id="handArea" style="display:flex;flex-wrap:wrap;justify-content:center;gap:0.5em 0.3em;">';
+          html += '<div id="handArea" style="display:flex;max-width:500px;background:#eee;padding:10px;box-sizing:border-box;margin:0 auto 10px auto;overflow:visible;">';
           myCards.forEach((card, i) => {
             const isSelected = selected.includes(i);
-            html += `<div class="cardBtn" data-idx="${i}" style="width:48px;height:72px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:2px solid ${isSelected ? '#ff9800' : '#bdb76b'};border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.3em;font-weight:bold;box-shadow:0 1px 4px rgba(0,0,0,0.08);cursor:pointer; transition: all 0.2s;">${card === 'J' ? '🃏' : card}</div>`;
+            html += `<div class="cardBtn" data-idx="${i}" style="overflow:visible;width:1px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''}">`;
+            html += `<div style="width:100px;height:200px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:5px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;display:flex;align-items:center;justify-content:center;font-size:2em;font-weight:bold;cursor:pointer;transition:all 0.2s;border-radius:8px;">${card === 'J' ? '🃏' : card}</div>`;
+            html += '</div>';
           });
           html += '</div>';
           html += '<div style="text-align:center;margin-top:1.5em;">';
