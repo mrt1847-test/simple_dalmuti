@@ -338,10 +338,18 @@ io.on('connection', (socket) => {
       
       // 5초 후 자동으로 다음 게임 시작
       setTimeout(() => {
-        resetGame();
-        // 모든 플레이어를 자동 ready 처리
-        players.forEach(p => p.ready = true);
-        io.emit('players', players);
+        // 게임 상태만 리셋 (점수, totalScores 등은 유지)
+        game.inProgress = false;
+        game.ordered = [];
+        game.turnIdx = 0;
+        game.lastPlay = null;
+        game.passes = 0;
+        game.playerHands = [];
+        game.finished = [];
+        game.finishOrder = [];
+        game.gameCount = (game.gameCount || 1) + 1; // 게임 횟수 증가
+        // lastGameScores, totalScores는 유지
+
         startGameIfReady();
       }, 5000);
       return;
