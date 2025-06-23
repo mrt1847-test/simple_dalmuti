@@ -299,7 +299,13 @@ io.on('connection', (socket) => {
     const finishedCount = game.finished.filter(f => f).length;
     console.log(`게임 진행 상황: ${finishedCount}/${players.length} 완주`);
     
-    if (finishedCount >= players.length) { // 모든 플레이어가 완주했을 때만 게임 종료
+    if (finishedCount >= players.length - 1) { // 한 명만 남으면 게임 종료
+      // 남은 한 명 자동 꼴찌 처리
+      const lastIdx = game.finished.findIndex(f => !f);
+      if (lastIdx !== -1) {
+        game.finished[lastIdx] = true;
+        game.finishOrder.push(lastIdx);
+      }
       console.log('모든 플레이어가 완주했습니다! 게임 종료.');
       
       const scores = [10, 8, 6, 5, 4, 3].slice(0, players.length);
