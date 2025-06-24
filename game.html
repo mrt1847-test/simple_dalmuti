@@ -22,8 +22,11 @@
       #gameArea { min-width: auto; width: 100%; max-width: 400px; }
       #chatWrap { width: 100%; max-width: 400px; margin-left: 0; margin-top: 1em; height: 300px; }
       
-      /* 원탁과 다른 요소들 사이 간격 조정 */
-      .table-circle { margin-bottom: 0.5em !important; }
+      /* 타이틀과 원탁 사이 간격 조정 */
+      h1 { margin-bottom: 1.5em !important; }
+      
+      /* 턴 정보와 원탁 사이 간격 조정 */
+      #gameContent > div:nth-child(2) { margin-top: 1.5em !important; }
       
       /* 플레이어 카드 폰트 크기 조정 */
       .player-card div { font-size: 0.8em !important; }
@@ -48,8 +51,11 @@
       #gameArea { max-width: 100%; }
       #chatWrap { max-width: 100%; }
       
-      /* 원탁과 다른 요소들 사이 간격 더 조정 */
-      .table-circle { margin-bottom: 0.3em !important; }
+      /* 타이틀과 원탁 사이 간격 더 조정 */
+      h1 { margin-bottom: 1em !important; }
+      
+      /* 턴 정보와 원탁 사이 간격 더 조정 */
+      #gameContent > div:nth-child(2) { margin-top: 1em !important; }
       
       /* 플레이어 카드 폰트 크기 더 작게 */
       .player-card div { font-size: 0.7em !important; }
@@ -71,7 +77,7 @@
 <body>
   <div id="mainWrap">
     <div id="gameArea">
-      <h1 style="text-align:center;">달무티 게임</h1>
+      <h1 style="text-align:center;margin-bottom:2em;">달무티 게임</h1>
       <div id="gameContent"></div>
     </div>
     <div id="chatWrap">
@@ -181,7 +187,7 @@
 
         // 3. 턴 정보
         if (turnInfo && turnInfo.currentPlayer) {
-          html += `<div style="text-align:center;margin:1em 0;font-size:1.2em;">`;
+          html += `<div style="text-align:center;margin:2.5em 0 1em 0;font-size:1.2em;">`;
           if (turnInfo.currentPlayer.id === socket.id) {
             html += '<div style="color:#4caf50;font-weight:bold;">🎯 당신의 차례입니다!</div>';
           } else {
