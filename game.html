@@ -318,7 +318,7 @@
       // 카드 교환 이벤트 핸들러
       socket.on('cardExchange', (data) => {
         console.log('카드 교환 완료:', data);
-        appendChat(`🔄 카드 교환: ${data.slave.nickname}님이 ${data.slave.cards.map(c => c === 'J' ? '🃏' : c).join(' ')}를 ${data.dalmuti.nickname}님에게 주고, ${data.dalmuti.nickname}님이 ${data.dalmuti.cards.map(c => c === 'J' ? '🃏' : c).join(' ')}를 ${data.slave.nickname}님에게 주었습니다.`, false);
+        appendChat(`🔄 카드 교환 완료`, false);
       });
 
       // 달무티 카드 선택 요청 이벤트
