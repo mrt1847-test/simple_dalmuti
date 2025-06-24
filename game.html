@@ -28,6 +28,14 @@
       /* 카드 크기 조정 */
       .cardBtn > div { width: 60px !important; height: 90px !important; font-size: 1.5em !important; }
       
+      /* 핸드 카드 영역 최적화 - 8장 이상일 때 두 줄로 */
+      #handArea { 
+        flex-wrap: wrap !important; 
+        justify-content: center !important; 
+        gap: 5px !important;
+        max-width: 400px !important;
+      }
+      
       /* 필드 카드 크기 조정 */
       #gameContent div[style*="width:80px;height:130px"] { width: 60px !important; height: 90px !important; }
     }
@@ -42,6 +50,12 @@
       
       /* 카드 더 작게 */
       .cardBtn > div { width: 50px !important; height: 75px !important; font-size: 1.2em !important; }
+      
+      /* 핸드 카드 영역 더 작은 화면에서 최적화 */
+      #handArea { 
+        max-width: 100% !important; 
+        gap: 3px !important;
+      }
       
       /* 필드 카드 더 작게 */
       #gameContent div[style*="width:80px;height:130px"] { width: 50px !important; height: 75px !important; }
