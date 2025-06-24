@@ -206,6 +206,16 @@ function startGameIfReady() {
           hand: game.playerHands[dalmutiIdx]
         });
         console.log(`달무티(${game.ordered[dalmutiIdx].nickname})에게 selectCardsForSlave 이벤트 전송 완료`);
+        console.log(`달무티 소켓 ID: ${game.ordered[dalmutiIdx].id}`);
+        console.log(`달무티 손패 개수: ${game.playerHands[dalmutiIdx].length}장`);
+        
+        // 달무티가 실제로 연결되어 있는지 확인
+        const dalmutiSocket = io.sockets.sockets.get(game.ordered[dalmutiIdx].id);
+        if (dalmutiSocket) {
+          console.log('달무티 소켓이 연결되어 있습니다.');
+        } else {
+          console.log('⚠️ 경고: 달무티 소켓이 연결되어 있지 않습니다!');
+        }
         
         // 다른 플레이어들에게 대기 메시지
         game.ordered.forEach((p, i) => {
@@ -258,11 +268,27 @@ io.on('connection', (socket) => {
       const playerIndex = game.ordered.findIndex(p => p.nickname === nickname);
       if (playerIndex !== -1) {
         console.log(`게임 참가자 ${nickname}가 game.html에 연결했습니다.`);
+        console.log(`이전 소켓 ID: ${game.ordered[playerIndex].id}`);
+        console.log(`새로운 소켓 ID: ${socket.id}`);
         
         // 새로운 소켓 ID로 플레이어 정보 업데이트
         game.ordered[playerIndex].id = socket.id;
         const playerInLobbyList = players.find(p => p.nickname === nickname);
         if (playerInLobbyList) playerInLobbyList.id = socket.id;
+
+        console.log(`소켓 ID 업데이트 완료: ${nickname} -> ${socket.id}`);
+        
+        // 카드 교환 단계가 진행 중이고 이 플레이어가 달무티라면 카드 선택 요청을 다시 보냄
+        if (game.cardExchangeInProgress && game.ordered[playerIndex].role === '달무티') {
+          console.log(`달무티 ${nickname} 재접속 - 카드 선택 요청을 다시 보냅니다.`);
+          setTimeout(() => {
+            io.to(socket.id).emit('selectCardsForSlave', {
+              message: '농노에게 줄 카드 2장을 선택하세요.',
+              hand: game.playerHands[playerIndex]
+            });
+            console.log(`달무티 ${nickname}에게 selectCardsForSlave 이벤트 재전송 완료`);
+          }, 1000);
+        }
 
         // 해당 플레이어에게 게임 데이터 전송
         io.to(socket.id).emit('gameSetup', {
