@@ -16,6 +16,22 @@
     #chatSend:hover { background: #689f38; }
     button { padding: 0.7rem 2rem; font-size: 1.1rem; border-radius: 6px; border: none; background: #8bc34a; color: white; cursor: pointer; margin-top: 1em; }
     button:hover { background: #689f38; }
+
+    /* 모바일 대응 */
+    @media (max-width: 768px) {
+      body { height: auto; min-height: 100vh; padding: 10px; }
+      #mainWrap { flex-direction: column; align-items: center; }
+      #lobbyArea { min-width: auto; width: 100%; max-width: 400px; }
+      #chatWrap { width: 100%; max-width: 400px; margin-left: 0; margin-top: 1em; height: 300px; }
+      h1 { font-size: 1.5rem; }
+      button { font-size: 1rem; }
+    }
+
+    @media (max-width: 480px) {
+      #lobbyArea { max-width: 100%; }
+      #chatWrap { max-width: 100%; }
+      h1 { font-size: 1.3rem; }
+    }
   </style>
 </head>
 <body>
