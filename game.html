@@ -26,7 +26,7 @@
       h1 { margin-bottom: 1.5em !important; }
       
       /* 턴 정보와 원탁 사이 간격 조정 */
-      #gameContent > div:nth-child(2) { margin-top: 1.5em !important; }
+      #gameContent > div:nth-child(2) { margin-top: 3.5em !important; }
       
       /* 플레이어 카드 폰트 크기 조정 */
       .player-card div { font-size: 0.8em !important; }
@@ -55,7 +55,7 @@
       h1 { margin-bottom: 1em !important; }
       
       /* 턴 정보와 원탁 사이 간격 더 조정 */
-      #gameContent > div:nth-child(2) { margin-top: 1em !important; }
+      #gameContent > div:nth-child(2) { margin-top: 3.5em !important; }
       
       /* 플레이어 카드 폰트 크기 더 작게 */
       .player-card div { font-size: 0.7em !important; }
@@ -187,7 +187,7 @@
 
         // 3. 턴 정보
         if (turnInfo && turnInfo.currentPlayer) {
-          html += `<div style="text-align:center;margin:2.5em 0 1em 0;font-size:1.2em;">`;
+          html += `<div style="text-align:center;margin:3.5em 0 1em 0;font-size:1.2em;">`;
           if (turnInfo.currentPlayer.id === socket.id) {
             html += '<div style="color:#4caf50;font-weight:bold;">🎯 당신의 차례입니다!</div>';
           } else {
