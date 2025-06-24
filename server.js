@@ -185,6 +185,10 @@ function startGameIfReady() {
       game.cardExchangeInProgress = true;
       game.slaveCardsGiven = lowestCards;
       
+      console.log('=== 카드 교환 단계 시작 설정 ===');
+      console.log(`cardExchangeInProgress: ${game.cardExchangeInProgress}`);
+      console.log(`slaveCardsGiven: [${game.slaveCardsGiven.join(',')}]`);
+      
       // 먼저 클라이언트들에게 게임 페이지로 이동하라고 알림
       io.emit('gameStart');
       console.log('gameStart 이벤트 전송. 클라이언트들이 game.html로 이동합니다.');
@@ -293,8 +297,14 @@ io.on('connection', (socket) => {
     if (player) player.ready = true;
     io.emit('players', players);
     
+    console.log('=== ready 이벤트 처리 ===');
+    console.log(`플레이어: ${player ? player.nickname : 'unknown'}`);
+    console.log(`카드 교환 진행 중: ${game.cardExchangeInProgress}`);
+    console.log(`게임 진행 중: ${game.inProgress}`);
+    
     // 카드 교환 단계가 진행 중이면 게임 시작하지 않음
     if (!game.cardExchangeInProgress) {
+      console.log('카드 교환 진행 중이 아니므로 startGameIfReady 호출');
       startGameIfReady();
     } else {
       console.log('카드 교환 단계가 진행 중이므로 ready 이벤트에서 게임 시작을 건너뜁니다.');
