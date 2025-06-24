@@ -27,7 +27,9 @@ let game = {
   finishOrder: [],
   gameCount: 1,
   lastGameScores: [],
-  totalScores: []
+  totalScores: [],
+  cardExchangeInProgress: false,
+  slaveCardsGiven: []
 };
 // ------------------------------------
 
@@ -62,7 +64,9 @@ function resetGame() {
     finishOrder: [],
     gameCount: 1,
     lastGameScores: [],
-    totalScores: []
+    totalScores: [],
+    cardExchangeInProgress: false,
+    slaveCardsGiven: []
   };
   players.forEach(p => p.ready = false);
   io.emit('players', players);
@@ -148,25 +152,73 @@ function startGameIfReady() {
     
     game.playerHands = hands; // 더 이상 map, slice 필요 없음. 위에서부터 격리됨.
 
-    // 디버그: 각 플레이어의 카드 수 확인
-    console.log('카드 분배 완료:');
-    game.ordered.forEach((p, i) => {
-      console.log(`${p.nickname} (${p.role}): ${game.playerHands[i].length}장`);
-    });
-
-    // 5. 클라이언트들에게 게임 페이지로 이동하라고 알림
-    io.emit('gameStart');
-    // 바로 게임 세팅 데이터도 전송
-    game.ordered.forEach((p, i) => {
-      io.to(p.id).emit('gameSetup', {
-        ordered: game.ordered.map((p, i) => ({ ...p, cardCount: game.playerHands[i].length, finished: game.finished[i] })),
-        myCards: game.playerHands[i],
-        turnInfo: { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx] },
-        field: game.lastPlay
+    // 5. 카드 교환 단계 (농노 ↔ 달무티)
+    const slaveIdx = game.ordered.findIndex(p => p.role === '노예');
+    if (dalmutiIdx !== -1 && slaveIdx !== -1) {
+      // 농노의 손패에서 가장 낮은 숫자 2장 찾기 (자동)
+      const slaveHand = [...game.playerHands[slaveIdx]];
+      slaveHand.sort((a, b) => {
+        const aVal = a === 'J' ? 13 : a;
+        const bVal = b === 'J' ? 13 : b;
+        return aVal - bVal;
       });
-    });
-    console.log('gameStart 이벤트 전송. 클라이언트들이 game.html로 이동합니다.');
+      const lowestCards = slaveHand.slice(0, 2);
+      
+      // 농노의 카드를 달무티에게 전달
+      lowestCards.forEach(card => {
+        const cardIndex = game.playerHands[slaveIdx].indexOf(card);
+        if (cardIndex > -1) {
+          game.playerHands[slaveIdx].splice(cardIndex, 1);
+          game.playerHands[dalmutiIdx].push(card);
+        }
+      });
+      
+      console.log(`농노(${game.ordered[slaveIdx].nickname})가 달무티에게 카드 전달: [${lowestCards.join(',')}]`);
+      
+      // 달무티에게 카드 선택 요청
+      io.to(game.ordered[dalmutiIdx].id).emit('selectCardsForSlave', {
+        message: '농노에게 줄 카드 2장을 선택하세요.',
+        hand: game.playerHands[dalmutiIdx]
+      });
+      
+      // 다른 플레이어들에게 대기 메시지
+      game.ordered.forEach((p, i) => {
+        if (i !== dalmutiIdx) {
+          io.to(p.id).emit('waitingForDalmuti', {
+            message: `${game.ordered[dalmutiIdx].nickname}님이 농노에게 줄 카드를 선택하고 있습니다...`
+          });
+        }
+      });
+      
+      // 카드 교환 완료 플래그 설정
+      game.cardExchangeInProgress = true;
+      game.slaveCardsGiven = lowestCards;
+    } else {
+      // 농노나 달무티가 없는 경우 바로 게임 시작
+      startGameAfterCardExchange();
+    }
+
+    // 카드 교환이 완료되면 게임이 시작됩니다 (dalmutiCardSelection 이벤트에서 처리)
+    console.log('카드 교환 단계 시작...');
   }
+}
+
+// 카드 교환 완료 후 게임 시작 함수
+function startGameAfterCardExchange() {
+  console.log('카드 교환 완료! 게임을 시작합니다.');
+  
+  // 클라이언트들에게 게임 페이지로 이동하라고 알림
+  io.emit('gameStart');
+  // 바로 게임 세팅 데이터도 전송
+  game.ordered.forEach((p, i) => {
+    io.to(p.id).emit('gameSetup', {
+      ordered: game.ordered.map((p, i) => ({ ...p, cardCount: game.playerHands[i].length, finished: game.finished[i] })),
+      myCards: game.playerHands[i],
+      turnInfo: { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx] },
+      field: game.lastPlay
+    });
+  });
+  console.log('gameStart 이벤트 전송. 클라이언트들이 game.html로 이동합니다.');
 }
 
 io.on('connection', (socket) => {
@@ -414,6 +466,58 @@ io.on('connection', (socket) => {
       } while (game.finished[game.turnIdx]);
       io.emit('turnChanged', { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx] });
     }
+  });
+
+  // 달무티가 농노에게 줄 카드 선택
+  socket.on('dalmutiCardSelection', (selectedCards, cb) => {
+    const idx = game.ordered.findIndex(p => p.id === socket.id);
+    const dalmutiIdx = game.ordered.findIndex(p => p.role === '달무티');
+    
+    if (!game.cardExchangeInProgress || idx !== dalmutiIdx) {
+      return cb && cb({success: false, message: '카드 교환 단계가 아니거나 달무티가 아닙니다.'});
+    }
+    
+    if (selectedCards.length !== 2) {
+      return cb && cb({success: false, message: '정확히 2장의 카드를 선택해주세요.'});
+    }
+    
+    // 선택된 카드가 손패에 있는지 확인
+    const hand = [...game.playerHands[idx]];
+    for (const card of selectedCards) {
+      const cardIndex = hand.indexOf(card);
+      if (cardIndex === -1) {
+        return cb && cb({success: false, message: '손패에 없는 카드를 선택했습니다.'});
+      }
+      hand.splice(cardIndex, 1); // 중복 선택 방지를 위해 임시로 제거
+    }
+    
+    // 농노에게 카드 전달
+    const slaveIdx = game.ordered.findIndex(p => p.role === '노예');
+    selectedCards.forEach(card => {
+      const cardIndex = game.playerHands[idx].indexOf(card);
+      if (cardIndex > -1) {
+        game.playerHands[idx].splice(cardIndex, 1);
+        game.playerHands[slaveIdx].push(card);
+      }
+    });
+    
+    console.log(`달무티(${game.ordered[idx].nickname})가 농노에게 카드 전달: [${selectedCards.join(',')}]`);
+    
+    // 카드 교환 완료 알림
+    io.emit('cardExchange', {
+      slave: { nickname: game.ordered[slaveIdx].nickname, cards: game.slaveCardsGiven },
+      dalmuti: { nickname: game.ordered[idx].nickname, cards: selectedCards }
+    });
+    
+    // 카드 교환 완료 플래그 해제
+    game.cardExchangeInProgress = false;
+    game.slaveCardsGiven = [];
+    
+    // 게임 시작 준비 완료
+    cb && cb({success: true});
+    
+    // 카드 교환 완료 후 게임 시작
+    startGameAfterCardExchange();
   });
 });
 
