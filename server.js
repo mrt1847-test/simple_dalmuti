@@ -175,24 +175,33 @@ function startGameIfReady() {
       
       console.log(`농노(${game.ordered[slaveIdx].nickname})가 달무티에게 카드 전달: [${lowestCards.join(',')}]`);
       
-      // 달무티에게 카드 선택 요청
-      io.to(game.ordered[dalmutiIdx].id).emit('selectCardsForSlave', {
-        message: '농노에게 줄 카드 2장을 선택하세요.',
-        hand: game.playerHands[dalmutiIdx]
-      });
-      
-      // 다른 플레이어들에게 대기 메시지
-      game.ordered.forEach((p, i) => {
-        if (i !== dalmutiIdx) {
-          io.to(p.id).emit('waitingForDalmuti', {
-            message: `${game.ordered[dalmutiIdx].nickname}님이 농노에게 줄 카드를 선택하고 있습니다...`
-          });
-        }
-      });
-      
       // 카드 교환 완료 플래그 설정
       game.cardExchangeInProgress = true;
       game.slaveCardsGiven = lowestCards;
+      
+      // 먼저 클라이언트들에게 게임 페이지로 이동하라고 알림
+      io.emit('gameStart');
+      console.log('gameStart 이벤트 전송. 클라이언트들이 game.html로 이동합니다.');
+      
+      // 3초 후에 카드 선택 요청 (클라이언트들이 game.html로 이동할 시간을 줌)
+      setTimeout(() => {
+        // 달무티에게 카드 선택 요청
+        io.to(game.ordered[dalmutiIdx].id).emit('selectCardsForSlave', {
+          message: '농노에게 줄 카드 2장을 선택하세요.',
+          hand: game.playerHands[dalmutiIdx]
+        });
+        
+        // 다른 플레이어들에게 대기 메시지
+        game.ordered.forEach((p, i) => {
+          if (i !== dalmutiIdx) {
+            io.to(p.id).emit('waitingForDalmuti', {
+              message: `${game.ordered[dalmutiIdx].nickname}님이 농노에게 줄 카드를 선택하고 있습니다...`
+            });
+          }
+        });
+        
+        console.log('카드 교환 단계 시작...');
+      }, 3000);
     } else {
       // 농노나 달무티가 없는 경우 바로 게임 시작
       startGameAfterCardExchange();
@@ -207,9 +216,7 @@ function startGameIfReady() {
 function startGameAfterCardExchange() {
   console.log('카드 교환 완료! 게임을 시작합니다.');
   
-  // 클라이언트들에게 게임 페이지로 이동하라고 알림
-  io.emit('gameStart');
-  // 바로 게임 세팅 데이터도 전송
+  // 바로 게임 세팅 데이터 전송
   game.ordered.forEach((p, i) => {
     io.to(p.id).emit('gameSetup', {
       ordered: game.ordered.map((p, i) => ({ ...p, cardCount: game.playerHands[i].length, finished: game.finished[i] })),
@@ -218,7 +225,7 @@ function startGameAfterCardExchange() {
       field: game.lastPlay
     });
   });
-  console.log('gameStart 이벤트 전송. 클라이언트들이 game.html로 이동합니다.');
+  console.log('gameSetup 데이터 전송 완료.');
 }
 
 io.on('connection', (socket) => {
