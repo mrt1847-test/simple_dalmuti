@@ -22,6 +22,9 @@
       #gameArea { min-width: auto; width: 100%; max-width: 400px; }
       #chatWrap { width: 100%; max-width: 400px; margin-left: 0; margin-top: 1em; height: 300px; }
       
+      /* 원탁과 다른 요소들 사이 간격 조정 */
+      .table-circle { margin-bottom: 0.5em !important; }
+      
       /* 플레이어 카드 폰트 크기 조정 */
       .player-card div { font-size: 0.8em !important; }
       
@@ -44,6 +47,9 @@
     @media (max-width: 480px) {
       #gameArea { max-width: 100%; }
       #chatWrap { max-width: 100%; }
+      
+      /* 원탁과 다른 요소들 사이 간격 더 조정 */
+      .table-circle { margin-bottom: 0.3em !important; }
       
       /* 플레이어 카드 폰트 크기 더 작게 */
       .player-card div { font-size: 0.7em !important; }
@@ -126,7 +132,7 @@
           const playerCardWidth = isSmallMobile ? 70 : isMobile ? 80 : 120;
           const playerCardHeight = isSmallMobile ? 50 : isMobile ? 60 : 80;
           
-          html += `<div class="table-circle" style="position:relative;width:${tableSize}px;height:${tableSize}px;margin:0 auto;background:#f5f5dc;border-radius:50%;box-shadow:0 2px 12px rgba(0,0,0,0.08);margin-bottom: 2em;">`;
+          html += `<div class="table-circle" style="position:relative;width:${tableSize}px;height:${tableSize}px;margin:0 auto;background:#f5f5dc;border-radius:50%;box-shadow:0 2px 12px rgba(0,0,0,0.08);margin-bottom: 1em;">`;
           ordered.forEach((p, i) => {
             const angle = (2 * Math.PI * i) / n - Math.PI / 2;
             const x = tableSize/2 + radius * Math.cos(angle) - playerCardWidth/2;
@@ -175,7 +181,7 @@
 
         // 3. 턴 정보
         if (turnInfo && turnInfo.currentPlayer) {
-          html += `<div style="text-align:center;margin-bottom:1em;font-size:1.2em;">`;
+          html += `<div style="text-align:center;margin:1em 0;font-size:1.2em;">`;
           if (turnInfo.currentPlayer.id === socket.id) {
             html += '<div style="color:#4caf50;font-weight:bold;">🎯 당신의 차례입니다!</div>';
           } else {
