@@ -278,26 +278,37 @@ io.on('connection', (socket) => {
 
         console.log(`소켓 ID 업데이트 완료: ${nickname} -> ${socket.id}`);
         
-        // 카드 교환 단계가 진행 중이고 이 플레이어가 달무티라면 카드 선택 요청을 다시 보냄
-        if (game.cardExchangeInProgress && game.ordered[playerIndex].role === '달무티') {
-          console.log(`달무티 ${nickname} 재접속 - 카드 선택 요청을 다시 보냅니다.`);
-          setTimeout(() => {
-            io.to(socket.id).emit('selectCardsForSlave', {
-              message: '농노에게 줄 카드 2장을 선택하세요.',
-              hand: game.playerHands[playerIndex]
-            });
-            console.log(`달무티 ${nickname}에게 selectCardsForSlave 이벤트 재전송 완료`);
-          }, 1000);
-        }
+        // --- 재접속 시 상태에 따른 분기 처리 ---
+        if (game.cardExchangeInProgress) {
+          const dalmutiIdx = game.ordered.findIndex(p => p.role === '달무티');
+          const dalmuti = game.ordered[dalmutiIdx];
 
-        // 해당 플레이어에게 게임 데이터 전송
-        io.to(socket.id).emit('gameSetup', {
-          ordered: game.ordered.map((p, i) => ({ ...p, cardCount: game.playerHands[i].length, finished: game.finished[i] })),
-          myCards: game.playerHands[playerIndex],
-          turnInfo: { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx] },
-          field: game.lastPlay
-        });
-        console.log(`${nickname}에게 gameSetup 데이터 전송 완료.`);
+          if (playerIndex === dalmutiIdx) {
+            // 재접속한 플레이어가 '달무티'인 경우
+            console.log(`달무티 ${nickname} 재접속 - 카드 선택 요청을 다시 보냅니다.`);
+            setTimeout(() => { // 클라이언트가 준비될 시간을 줍니다.
+              io.to(socket.id).emit('selectCardsForSlave', {
+                message: '농노에게 줄 카드 2장을 선택하세요.',
+                hand: game.playerHands[playerIndex]
+              });
+            }, 500);
+          } else {
+            // 재접속한 플레이어가 다른 플레이어인 경우
+            console.log(`${nickname} 재접속 - 대기 화면을 표시합니다.`);
+            io.to(socket.id).emit('waitingForDalmuti', {
+              message: `${dalmuti.nickname}님이 농노에게 줄 카드를 선택하고 있습니다...`
+            });
+          }
+        } else {
+          // 카드 교환 단계가 아닐 때만 gameSetup 전송
+          io.to(socket.id).emit('gameSetup', {
+            ordered: game.ordered.map((p, i) => ({ ...p, cardCount: game.playerHands[i].length, finished: game.finished[i] })),
+            myCards: game.playerHands[playerIndex],
+            turnInfo: { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx] },
+            field: game.lastPlay
+          });
+        }
+        
         return callback({ success: true, inGame: true });
       }
     }
