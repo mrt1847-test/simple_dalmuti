@@ -26,8 +26,8 @@ let game = {
   finished: [],
   finishOrder: [],
   gameCount: 1,
-  lastGameScores: [],
-  totalScores: [],
+  lastGameScores: {}, // { nickname: score }
+  totalScores: {},    // { nickname: totalScore }
   cardExchangeInProgress: false,
   slaveCardsGiven: [],
   minerCardsGiven: [],
@@ -66,8 +66,8 @@ function resetGame() {
     finished: [],
     finishOrder: [],
     gameCount: 1,
-    lastGameScores: [],
-    totalScores: [],
+    lastGameScores: {},
+    totalScores: {},
     cardExchangeInProgress: false,
     slaveCardsGiven: [],
     minerCardsGiven: [],
@@ -104,17 +104,13 @@ function startGameIfReady() {
     // 디버깅: players와 lastGameScores 매칭 상태 출력
     console.log('players:', players.map((p, i) => `${i}: ${p.nickname}`));
     console.log('lastGameScores:', game.lastGameScores);
-    if (game.gameCount && game.gameCount > 1 && game.lastGameScores.length === players.length) {
+    if (game.gameCount && game.gameCount > 1 && Object.keys(game.lastGameScores).length === players.length) {
       // 두 번째 게임부터는 바로 전 게임 점수 높은 순으로 역할 배정
-      picked = players.map((p) => {
-        // p.nickname에 해당하는 점수 인덱스를 찾음
-        const idx = game.ordered.findIndex(o => o.nickname === p.nickname);
-        return {
-          id: p.id,
-          nickname: p.nickname,
-          score: game.lastGameScores[idx] || 0
-        };
-      });
+      picked = players.map((p) => ({
+        id: p.id,
+        nickname: p.nickname,
+        score: game.lastGameScores[p.nickname] || 0
+      }));
       picked.sort((a, b) => b.score - a.score);
       // 디버깅: picked와 roles 매칭 상태 출력
       console.log('picked:', picked.map(p => `${p.nickname}:${p.score}`));
@@ -584,13 +580,16 @@ io.on('connection', (socket) => {
       
       const scores = [10, 8, 6, 5, 4, 3].slice(0, players.length);
       const result = game.finishOrder.map((playerIdx, i) => {
-        game.lastGameScores[playerIdx] = scores[i] || 0;
-        game.totalScores[playerIdx] = (game.totalScores[playerIdx] || 0) + game.lastGameScores[playerIdx];
+        const nickname = game.ordered[playerIdx].nickname;
+        const role = game.ordered[playerIdx].role;
+        const score = scores[i] || 0;
+        game.lastGameScores[nickname] = score;
+        game.totalScores[nickname] = (game.totalScores[nickname] || 0) + score;
         return {
-          nickname: game.ordered[playerIdx].nickname,
-          role: game.ordered[playerIdx].role,
-          score: game.lastGameScores[playerIdx],
-          total: game.totalScores[playerIdx]
+          nickname,
+          role,
+          score,
+          total: game.totalScores[nickname]
         }
       });
       
