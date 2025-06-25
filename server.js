@@ -101,14 +101,25 @@ function startGameIfReady() {
     // 2. 신분 및 순서 배정
     let picked;
     const roles = ['달무티', '대주교', '평민', '평민', '광부', '노예'].slice(0, players.length);
+    // 디버깅: players와 lastGameScores 매칭 상태 출력
+    console.log('players:', players.map((p, i) => `${i}: ${p.nickname}`));
+    console.log('lastGameScores:', game.lastGameScores);
     if (game.gameCount && game.gameCount > 1 && game.lastGameScores.length === players.length) {
       // 두 번째 게임부터는 바로 전 게임 점수 높은 순으로 역할 배정
-      picked = players.map((p, i) => ({
-        id: p.id,
-        nickname: p.nickname,
-        score: game.lastGameScores[i] || 0
-      }));
-      picked.sort((a, b) => b.score - a.score); // 높은 점수 순
+      picked = players.map((p) => {
+        // p.nickname에 해당하는 점수 인덱스를 찾음
+        const idx = game.ordered.findIndex(o => o.nickname === p.nickname);
+        return {
+          id: p.id,
+          nickname: p.nickname,
+          score: game.lastGameScores[idx] || 0
+        };
+      });
+      picked.sort((a, b) => b.score - a.score);
+      // 디버깅: picked와 roles 매칭 상태 출력
+      console.log('picked:', picked.map(p => `${p.nickname}:${p.score}`));
+      console.log('roles:', roles);
+      console.log('배정:', picked.map((p, i) => `${p.nickname} => ${roles[i]}`));
       game.ordered = picked.map((p, i) => ({ ...p, role: roles[i] }));
     } else {
       // 첫 게임은 랜덤
