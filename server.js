@@ -103,7 +103,10 @@ function startGameIfReady() {
     const roles = ['달무티', '대주교', '평민', '평민', '광부', '노예'].slice(0, players.length);
     if (game.gameCount && game.gameCount > 1 && game.lastGameScores.length === players.length) {
       // 두 번째 게임부터는 바로 전 게임 점수 높은 순으로 역할 배정
-      picked = players.map((p, i) => ({ id: p.id, nickname: p.nickname, score: game.lastGameScores[i] || 0 }));
+      picked = game.finishOrder.map((playerIdx) => {
+        const p = players[playerIdx];
+        return { id: p.id, nickname: p.nickname, score: game.lastGameScores[playerIdx] || 0 };
+      });
       picked.sort((a, b) => b.score - a.score); // 높은 점수 순
       game.ordered = picked.map((p, i) => ({ ...p, role: roles[i] }));
     } else {
