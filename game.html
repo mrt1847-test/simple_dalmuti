@@ -413,9 +413,126 @@
         }
       });
 
+      // 대주교 카드 선택 요청 이벤트
+      socket.on('selectCardsForMiner', (data) => {
+        console.log('=== selectCardsForMiner 이벤트 수신 ===');
+        console.log('이벤트 데이터:', data);
+        console.log('현재 소켓 ID:', socket.id);
+        console.log('현재 닉네임:', nickname);
+        console.log('카드 선택 모드 활성화');
+        
+        isCardSelectionMode = true;
+        myCards = data.hand.sort((a,b) => (a==='J' ? 13 : a) - (b==='J' ? 13 : b));
+        selected = [];
+        
+        console.log('정렬된 카드:', myCards);
+        
+        // 카드 선택 UI 표시
+        const gameContent = document.getElementById('gameContent');
+        if (gameContent) {
+          console.log('gameContent 요소 찾음, UI 생성 시작');
+          
+          let html = '<div style="text-align:center;margin-bottom:2em;">';
+          html += '<h2 style="color:#ff9800;">🎯 광부에게 줄 카드 1장을 선택하세요</h2>';
+          html += '<p style="color:#666;margin-bottom:1em;">정확히 1장의 카드를 선택해주세요.</p>';
+          html += '</div>';
+          
+          html += '<div style="margin-top:1em;border-top:1px solid #ccc;padding-top:1em;">';
+          html += '<h2 style="text-align:center;margin:0 0 1em 0;">내 카드</h2>';
+          html += '<div id="handArea" style="display:flex;background:#eee;padding:10px;box-sizing:border-box;margin:0 auto 10px auto;overflow:visible;">';
+          myCards.forEach((card, i) => {
+            const isSelected = selected.includes(i);
+            html += `<div class="cardBtn" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''}">`;
+            html += `<div style="width:100px;height:200px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:5px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;">`;
+            html += `<div style="position:absolute;top:5px;left:5px;font-size:1.2em;font-weight:bold;">${card === 'J' ? '🃏' : card}</div>`;
+            html += '</div>';
+            html += '</div>';
+          });
+          html += '</div>';
+          html += '<div style="text-align:center;margin-top:1.5em;">';
+          html += '<button id="confirmSelectionBtn" style="padding:0.7em 2em;font-size:1.1em;background:#4caf50;color:white;border:none;border-radius:8px;cursor:pointer;">선택 완료</button>';
+          html += '</div>';
+          html += '</div>';
+          
+          gameContent.innerHTML = html;
+          console.log('카드 선택 UI 생성 완료');
+          
+          // 카드 선택 이벤트 리스너
+          document.querySelectorAll('.cardBtn').forEach(btn => {
+            btn.onclick = function() {
+              const idx = parseInt(this.getAttribute('data-idx'));
+              
+              if (selected.includes(idx)) { // 선택 해제
+                selected = selected.filter(i => i !== idx);
+              } else { // 새로 선택
+                if (selected.length < 1) {
+                  selected.push(idx);
+                } else {
+                  alert('최대 1장까지만 선택할 수 있습니다.');
+                }
+              }
+              
+              // UI 업데이트
+              document.querySelectorAll('.cardBtn').forEach((cardBtn, i) => {
+                const cardDiv = cardBtn.querySelector('div');
+                const isSelected = selected.includes(i);
+                cardDiv.style.background = isSelected ? '#ffe082' : '#fffbe6';
+                cardDiv.style.borderColor = isSelected ? '#ff9800' : '#bdb76b';
+              });
+            };
+          });
+          
+          // 선택 완료 버튼
+          document.getElementById('confirmSelectionBtn').onclick = function() {
+            if (selected.length !== 1) {
+              alert('정확히 1장의 카드를 선택해주세요.');
+              return;
+            }
+            
+            const selectedCards = selected.map(i => myCards[i]);
+            console.log('선택된 카드:', selectedCards);
+            socket.emit('archbishopCardSelection', selectedCards, (res) => {
+              if (res && !res.success) {
+                alert(res.message);
+              } else {
+                isCardSelectionMode = false;
+                appendChat('✅ 카드 선택이 완료되었습니다.', true);
+              }
+            });
+          };
+        } else {
+          console.error('gameContent 요소를 찾을 수 없습니다!');
+        }
+      });
+
       // 달무티 카드 선택 대기 이벤트
       socket.on('waitingForDalmuti', (data) => {
         console.log('=== waitingForDalmuti 이벤트 수신 ===');
+        console.log('대기 메시지:', data);
+        console.log('현재 소켓 ID:', socket.id);
+        console.log('현재 닉네임:', nickname);
+        
+        appendChat(`⏳ ${data.message}`, false);
+        
+        // 대기 화면 표시
+        const gameContent = document.getElementById('gameContent');
+        if (gameContent) {
+          console.log('대기 화면 UI 생성 시작');
+          let html = '<div style="text-align:center;margin:2em 0;">';
+          html += '<h2 style="color:#666;">⏳ 카드 교환 대기 중...</h2>';
+          html += `<p style="color:#888;">${data.message}</p>`;
+          html += '<div style="margin-top:2em;font-size:2em;">🔄</div>';
+          html += '</div>';
+          gameContent.innerHTML = html;
+          console.log('대기 화면 UI 생성 완료');
+        } else {
+          console.error('gameContent 요소를 찾을 수 없습니다!');
+        }
+      });
+
+      // 카드 교환 대기 이벤트 (달무티와 대주교 모두)
+      socket.on('waitingForCardExchange', (data) => {
+        console.log('=== waitingForCardExchange 이벤트 수신 ===');
         console.log('대기 메시지:', data);
         console.log('현재 소켓 ID:', socket.id);
         console.log('현재 닉네임:', nickname);

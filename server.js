@@ -29,7 +29,10 @@ let game = {
   lastGameScores: [],
   totalScores: [],
   cardExchangeInProgress: false,
-  slaveCardsGiven: []
+  slaveCardsGiven: [],
+  minerCardsGiven: [],
+  dalmutiCardSelected: false,
+  archbishopCardSelected: false
 };
 // ------------------------------------
 
@@ -66,7 +69,10 @@ function resetGame() {
     lastGameScores: [],
     totalScores: [],
     cardExchangeInProgress: false,
-    slaveCardsGiven: []
+    slaveCardsGiven: [],
+    minerCardsGiven: [],
+    dalmutiCardSelected: false,
+    archbishopCardSelected: false
   };
   players.forEach(p => p.ready = false);
   io.emit('players', players);
@@ -158,8 +164,11 @@ function startGameIfReady() {
     
     game.playerHands = hands; // 더 이상 map, slice 필요 없음. 위에서부터 격리됨.
 
-    // 5. 카드 교환 단계 (농노 ↔ 달무티)
+    // 5. 카드 교환 단계 (농노 ↔ 달무티, 광부 ↔ 대주교)
     const slaveIdx = game.ordered.findIndex(p => p.role === '노예');
+    const minerIdx = game.ordered.findIndex(p => p.role === '광부');
+    const archbishopIdx = game.ordered.findIndex(p => p.role === '대주교');
+    
     if (dalmutiIdx !== -1 && slaveIdx !== -1) {
       // 농노의 손패에서 가장 낮은 숫자 2장 찾기 (자동)
       const slaveHand = [...game.playerHands[slaveIdx]];
@@ -184,10 +193,45 @@ function startGameIfReady() {
       // 카드 교환 완료 플래그 설정
       game.cardExchangeInProgress = true;
       game.slaveCardsGiven = lowestCards;
+    }
+    
+    if (minerIdx !== -1 && archbishopIdx !== -1) {
+      // 광부의 손패에서 가장 낮은 숫자 1장 찾기 (자동)
+      const minerHand = [...game.playerHands[minerIdx]];
+      minerHand.sort((a, b) => {
+        const aVal = a === 'J' ? 13 : a;
+        const bVal = b === 'J' ? 13 : b;
+        return aVal - bVal;
+      });
+      const lowestCard = minerHand[0];
       
+      // 광부의 카드를 대주교에게 전달
+      const cardIndex = game.playerHands[minerIdx].indexOf(lowestCard);
+      if (cardIndex > -1) {
+        game.playerHands[minerIdx].splice(cardIndex, 1);
+        game.playerHands[archbishopIdx].push(lowestCard);
+      }
+      
+      console.log(`광부(${game.ordered[minerIdx].nickname})가 대주교에게 카드 전달: [${lowestCard}]`);
+      
+      // 카드 교환 완료 플래그 설정
+      game.cardExchangeInProgress = true;
+      game.minerCardsGiven = [lowestCard];
+    }
+    
+    if (game.cardExchangeInProgress) {
       console.log('=== 카드 교환 단계 시작 설정 ===');
       console.log(`cardExchangeInProgress: ${game.cardExchangeInProgress}`);
-      console.log(`slaveCardsGiven: [${game.slaveCardsGiven.join(',')}]`);
+      if (game.slaveCardsGiven.length > 0) {
+        console.log(`slaveCardsGiven: [${game.slaveCardsGiven.join(',')}]`);
+      }
+      if (game.minerCardsGiven.length > 0) {
+        console.log(`minerCardsGiven: [${game.minerCardsGiven.join(',')}]`);
+      }
+      
+      // 카드 선택 완료 상태 초기화
+      game.dalmutiCardSelected = false;
+      game.archbishopCardSelected = false;
       
       // 먼저 클라이언트들에게 게임 페이지로 이동하라고 알림
       io.emit('gameStart');
@@ -196,41 +240,78 @@ function startGameIfReady() {
       // 3초 후에 카드 선택 요청 (클라이언트들이 game.html로 이동할 시간을 줌)
       setTimeout(() => {
         console.log('=== 카드 교환 단계 시작 ===');
-        console.log(`달무티 ID: ${game.ordered[dalmutiIdx].id}`);
-        console.log(`달무티 닉네임: ${game.ordered[dalmutiIdx].nickname}`);
-        console.log(`달무티 손패: [${game.playerHands[dalmutiIdx].join(',')}]`);
         
-        // 달무티에게 카드 선택 요청
-        io.to(game.ordered[dalmutiIdx].id).emit('selectCardsForSlave', {
-          message: '농노에게 줄 카드 2장을 선택하세요.',
-          hand: game.playerHands[dalmutiIdx]
-        });
-        console.log(`달무티(${game.ordered[dalmutiIdx].nickname})에게 selectCardsForSlave 이벤트 전송 완료`);
-        console.log(`달무티 소켓 ID: ${game.ordered[dalmutiIdx].id}`);
-        console.log(`달무티 손패 개수: ${game.playerHands[dalmutiIdx].length}장`);
+        // 달무티 카드 선택 요청
+        if (dalmutiIdx !== -1 && slaveIdx !== -1) {
+          console.log(`달무티 ID: ${game.ordered[dalmutiIdx].id}`);
+          console.log(`달무티 닉네임: ${game.ordered[dalmutiIdx].nickname}`);
+          console.log(`달무티 손패: [${game.playerHands[dalmutiIdx].join(',')}]`);
+          
+          // 달무티에게 카드 선택 요청
+          io.to(game.ordered[dalmutiIdx].id).emit('selectCardsForSlave', {
+            message: '농노에게 줄 카드 2장을 선택하세요.',
+            hand: game.playerHands[dalmutiIdx]
+          });
+          console.log(`달무티(${game.ordered[dalmutiIdx].nickname})에게 selectCardsForSlave 이벤트 전송 완료`);
+          console.log(`달무티 소켓 ID: ${game.ordered[dalmutiIdx].id}`);
+          console.log(`달무티 손패 개수: ${game.playerHands[dalmutiIdx].length}장`);
+          
+          // 달무티가 실제로 연결되어 있는지 확인
+          const dalmutiSocket = io.sockets.sockets.get(game.ordered[dalmutiIdx].id);
+          if (dalmutiSocket) {
+            console.log('달무티 소켓이 연결되어 있습니다.');
+          } else {
+            console.log('⚠️ 경고: 달무티 소켓이 연결되어 있지 않습니다!');
+          }
+        }
         
-        // 달무티가 실제로 연결되어 있는지 확인
-        const dalmutiSocket = io.sockets.sockets.get(game.ordered[dalmutiIdx].id);
-        if (dalmutiSocket) {
-          console.log('달무티 소켓이 연결되어 있습니다.');
-        } else {
-          console.log('⚠️ 경고: 달무티 소켓이 연결되어 있지 않습니다!');
+        // 대주교 카드 선택 요청
+        if (archbishopIdx !== -1 && minerIdx !== -1) {
+          console.log(`대주교 ID: ${game.ordered[archbishopIdx].id}`);
+          console.log(`대주교 닉네임: ${game.ordered[archbishopIdx].nickname}`);
+          console.log(`대주교 손패: [${game.playerHands[archbishopIdx].join(',')}]`);
+          
+          // 대주교에게 카드 선택 요청
+          io.to(game.ordered[archbishopIdx].id).emit('selectCardsForMiner', {
+            message: '광부에게 줄 카드 1장을 선택하세요.',
+            hand: game.playerHands[archbishopIdx]
+          });
+          console.log(`대주교(${game.ordered[archbishopIdx].nickname})에게 selectCardsForMiner 이벤트 전송 완료`);
+          console.log(`대주교 소켓 ID: ${game.ordered[archbishopIdx].id}`);
+          console.log(`대주교 손패 개수: ${game.playerHands[archbishopIdx].length}장`);
+          
+          // 대주교가 실제로 연결되어 있는지 확인
+          const archbishopSocket = io.sockets.sockets.get(game.ordered[archbishopIdx].id);
+          if (archbishopSocket) {
+            console.log('대주교 소켓이 연결되어 있습니다.');
+          } else {
+            console.log('⚠️ 경고: 대주교 소켓이 연결되어 있지 않습니다!');
+          }
         }
         
         // 다른 플레이어들에게 대기 메시지
         game.ordered.forEach((p, i) => {
-          if (i !== dalmutiIdx) {
-            io.to(p.id).emit('waitingForDalmuti', {
-              message: `${game.ordered[dalmutiIdx].nickname}님이 농노에게 줄 카드를 선택하고 있습니다...`
+          if (i !== dalmutiIdx && i !== archbishopIdx) {
+            let waitingMessage = '';
+            if (dalmutiIdx !== -1 && archbishopIdx !== -1) {
+              waitingMessage = `${game.ordered[dalmutiIdx].nickname}님과 ${game.ordered[archbishopIdx].nickname}님이 카드 교환을 진행하고 있습니다...`;
+            } else if (dalmutiIdx !== -1) {
+              waitingMessage = `${game.ordered[dalmutiIdx].nickname}님이 농노에게 줄 카드를 선택하고 있습니다...`;
+            } else if (archbishopIdx !== -1) {
+              waitingMessage = `${game.ordered[archbishopIdx].nickname}님이 광부에게 줄 카드를 선택하고 있습니다...`;
+            }
+            
+            io.to(p.id).emit('waitingForCardExchange', {
+              message: waitingMessage
             });
-            console.log(`${p.nickname}에게 waitingForDalmuti 이벤트 전송 완료`);
+            console.log(`${p.nickname}에게 waitingForCardExchange 이벤트 전송 완료`);
           }
         });
         
         console.log('카드 교환 단계 시작...');
       }, 3000);
     } else {
-      // 농노나 달무티가 없는 경우 바로 게임 시작
+      // 카드 교환이 필요한 역할이 없는 경우 바로 게임 시작
       startGameAfterCardExchange();
     }
 
@@ -245,6 +326,13 @@ function startGameAfterCardExchange() {
   console.log('카드 교환 완료! 게임을 시작합니다.');
   console.log(`게임 진행 중: ${game.inProgress}`);
   console.log(`카드 교환 진행 중: ${game.cardExchangeInProgress}`);
+  
+  // 카드 교환 완료 플래그 및 상태 초기화
+  game.cardExchangeInProgress = false;
+  game.slaveCardsGiven = [];
+  game.minerCardsGiven = [];
+  game.dalmutiCardSelected = false;
+  game.archbishopCardSelected = false;
   
   // 바로 게임 세팅 데이터 전송
   game.ordered.forEach((p, i) => {
@@ -281,7 +369,9 @@ io.on('connection', (socket) => {
         // --- 재접속 시 상태에 따른 분기 처리 ---
         if (game.cardExchangeInProgress) {
           const dalmutiIdx = game.ordered.findIndex(p => p.role === '달무티');
+          const archbishopIdx = game.ordered.findIndex(p => p.role === '대주교');
           const dalmuti = game.ordered[dalmutiIdx];
+          const archbishop = game.ordered[archbishopIdx];
 
           if (playerIndex === dalmutiIdx) {
             // 재접속한 플레이어가 '달무티'인 경우
@@ -292,11 +382,29 @@ io.on('connection', (socket) => {
                 hand: game.playerHands[playerIndex]
               });
             }, 500);
+          } else if (playerIndex === archbishopIdx) {
+            // 재접속한 플레이어가 '대주교'인 경우
+            console.log(`대주교 ${nickname} 재접속 - 카드 선택 요청을 다시 보냅니다.`);
+            setTimeout(() => { // 클라이언트가 준비될 시간을 줍니다.
+              io.to(socket.id).emit('selectCardsForMiner', {
+                message: '광부에게 줄 카드 1장을 선택하세요.',
+                hand: game.playerHands[playerIndex]
+              });
+            }, 500);
           } else {
             // 재접속한 플레이어가 다른 플레이어인 경우
             console.log(`${nickname} 재접속 - 대기 화면을 표시합니다.`);
-            io.to(socket.id).emit('waitingForDalmuti', {
-              message: `${dalmuti.nickname}님이 농노에게 줄 카드를 선택하고 있습니다...`
+            let waitingMessage = '';
+            if (dalmutiIdx !== -1 && archbishopIdx !== -1) {
+              waitingMessage = `${dalmuti.nickname}님과 ${archbishop.nickname}님이 카드 교환을 진행하고 있습니다...`;
+            } else if (dalmutiIdx !== -1) {
+              waitingMessage = `${dalmuti.nickname}님이 농노에게 줄 카드를 선택하고 있습니다...`;
+            } else if (archbishopIdx !== -1) {
+              waitingMessage = `${archbishop.nickname}님이 광부에게 줄 카드를 선택하고 있습니다...`;
+            }
+            
+            io.to(socket.id).emit('waitingForCardExchange', {
+              message: waitingMessage
             });
           }
         } else {
@@ -603,16 +711,96 @@ io.on('connection', (socket) => {
       dalmuti: { nickname: game.ordered[idx].nickname, cards: selectedCards }
     });
     
-    // 카드 교환 완료 플래그 해제
-    game.cardExchangeInProgress = false;
-    game.slaveCardsGiven = [];
+    // 달무티 카드 선택 완료 상태 업데이트
+    game.dalmutiCardSelected = true;
     
     // 게임 시작 준비 완료
     cb && cb({success: true});
     
-    // 카드 교환 완료 후 게임 시작
-    console.log('카드 교환 완료! 게임 시작 함수 호출');
-    startGameAfterCardExchange();
+    // 대주교도 카드 선택을 완료했는지 확인
+    const archbishopIdx = game.ordered.findIndex(p => p.role === '대주교');
+    if (archbishopIdx === -1 || game.archbishopCardSelected) {
+      // 대주교가 없거나 이미 카드 선택을 완료한 경우 게임 시작
+      console.log('달무티 카드 선택 완료! 게임 시작 함수 호출');
+      startGameAfterCardExchange();
+    } else {
+      console.log('달무티 카드 선택 완료! 대주교 카드 선택 대기 중...');
+    }
+  });
+
+  // 대주교가 광부에게 줄 카드 선택
+  socket.on('archbishopCardSelection', (selectedCards, cb) => {
+    console.log('=== archbishopCardSelection 이벤트 수신 ===');
+    console.log(`요청한 소켓 ID: ${socket.id}`);
+    console.log(`선택된 카드: [${selectedCards.join(',')}]`);
+    
+    const idx = game.ordered.findIndex(p => p.id === socket.id);
+    const archbishopIdx = game.ordered.findIndex(p => p.role === '대주교');
+    
+    console.log(`요청한 플레이어 인덱스: ${idx}`);
+    console.log(`대주교 인덱스: ${archbishopIdx}`);
+    console.log(`카드 교환 진행 중: ${game.cardExchangeInProgress}`);
+    
+    if (!game.cardExchangeInProgress || idx !== archbishopIdx) {
+      console.log('카드 교환 조건 불충족 - 이벤트 무시');
+      return cb && cb({success: false, message: '카드 교환 단계가 아니거나 대주교가 아닙니다.'});
+    }
+    
+    if (selectedCards.length !== 1) {
+      console.log('카드 개수 오류 - 이벤트 무시');
+      return cb && cb({success: false, message: '정확히 1장의 카드를 선택해주세요.'});
+    }
+    
+    // 선택된 카드가 손패에 있는지 확인
+    const hand = [...game.playerHands[idx]];
+    console.log(`대주교 손패: [${hand.join(',')}]`);
+    
+    for (const card of selectedCards) {
+      const cardIndex = hand.indexOf(card);
+      if (cardIndex === -1) {
+        console.log(`손패에 없는 카드 선택: ${card}`);
+        return cb && cb({success: false, message: '손패에 없는 카드를 선택했습니다.'});
+      }
+      hand.splice(cardIndex, 1); // 중복 선택 방지를 위해 임시로 제거
+    }
+    
+    // 광부에게 카드 전달
+    const minerIdx = game.ordered.findIndex(p => p.role === '광부');
+    console.log(`광부 인덱스: ${minerIdx}`);
+    
+    selectedCards.forEach(card => {
+      const cardIndex = game.playerHands[idx].indexOf(card);
+      if (cardIndex > -1) {
+        game.playerHands[idx].splice(cardIndex, 1);
+        game.playerHands[minerIdx].push(card);
+      }
+    });
+    
+    console.log(`대주교(${game.ordered[idx].nickname})가 광부에게 카드 전달: [${selectedCards.join(',')}]`);
+    console.log(`대주교 최종 손패: [${game.playerHands[idx].join(',')}]`);
+    console.log(`광부 최종 손패: [${game.playerHands[minerIdx].join(',')}]`);
+    
+    // 카드 교환 완료 알림 (대주교-광부)
+    io.emit('cardExchange', {
+      miner: { nickname: game.ordered[minerIdx].nickname, cards: game.minerCardsGiven },
+      archbishop: { nickname: game.ordered[idx].nickname, cards: selectedCards }
+    });
+    
+    // 대주교 카드 선택 완료 상태 업데이트
+    game.archbishopCardSelected = true;
+    
+    // 게임 시작 준비 완료
+    cb && cb({success: true});
+    
+    // 달무티도 카드 선택을 완료했는지 확인
+    const dalmutiIdx = game.ordered.findIndex(p => p.role === '달무티');
+    if (dalmutiIdx === -1 || game.dalmutiCardSelected) {
+      // 달무티가 없거나 이미 카드 선택을 완료한 경우 게임 시작
+      console.log('대주교 카드 선택 완료! 게임 시작 함수 호출');
+      startGameAfterCardExchange();
+    } else {
+      console.log('대주교 카드 선택 완료! 달무티 카드 선택 대기 중...');
+    }
   });
 });
 
