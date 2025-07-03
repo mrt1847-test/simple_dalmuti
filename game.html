@@ -21,7 +21,7 @@
     #mainWrap {
       display: flex;
       flex-direction: row;
-      justify-content: flex-end;
+      justify-content: flex-center;
       align-items: flex-start;
       flex-wrap: wrap;
       width: 100%;
@@ -69,7 +69,10 @@
       
       /* 핸드 카드 영역 최적화 - 8장 이상일 때 두 줄로 */
       #handArea { 
-        /* 원래대로 복구: flex-wrap, max-width, gap 등 제거 */
+        flex-wrap: wrap !important; 
+        justify-content: center !important; 
+        gap: 5px !important;
+        max-width: 400px !important;
       }
       
       /* 필드 카드 크기 조정 */
