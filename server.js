@@ -702,7 +702,8 @@ io.on('connection', (socket) => {
       cards, 
       lastPlay: game.lastPlay, 
       finished: game.finished,
-      playerHands: game.playerHands.map(hand => hand.length)
+      playerHands: game.playerHands.map(hand => hand.length),
+      ordered: game.ordered
     });
     cb && cb({success: true});
 
