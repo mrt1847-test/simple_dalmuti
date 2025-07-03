@@ -409,10 +409,12 @@ function startGameAfterCardExchange() {
   console.log('gameSetup 데이터 전송 완료.');
 }
 
+let timerEnabled = true; // 타이머 on/off 상태
 let turnTimer = null;
 
 function startTurnTimer() {
   clearTurnTimer();
+  if (!timerEnabled) return;
   if (!game.inProgress || game.finished[game.turnIdx]) return;
   turnTimer = setTimeout(() => {
     const currentPlayer = game.ordered[game.turnIdx];
@@ -585,6 +587,18 @@ io.on('connection', (socket) => {
   });
 
   socket.on('chat', (msg) => {
+    if (msg === '!타이머 off') {
+      timerEnabled = false;
+      io.emit('chat', {nickname: 'SYSTEM', msg: '⏰ 턴 제한시간이 꺼졌습니다.'});
+      clearTurnTimer();
+      return;
+    }
+    if (msg === '!타이머 on') {
+      timerEnabled = true;
+      io.emit('chat', {nickname: 'SYSTEM', msg: '⏰ 턴 제한시간이 켜졌습니다.'});
+      startTurnTimer();
+      return;
+    }
     io.emit('chat', {nickname: socket.nickname, msg});
   });
 
