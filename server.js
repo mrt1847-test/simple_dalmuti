@@ -88,20 +88,10 @@ function startGameIfReady() {
     return;
   }
 
-  // 참가자 선정: 최대 8명까지 참가, 나머지는 관전자
-  // (여기서는 players 전체가 참가자로 가정, 관전자 큐가 있다면 분리 필요)
   if (players.length >= MIN_PLAYERS && players.length <= MAX_PLAYERS && players.every(p => p.ready)) {
     console.log('게임 시작 조건 충족! 데이터 준비 중...');
     game.inProgress = true;
-
-    // --- spectator에서 참가자로 승격된 인원 자동 ready 처리 ---
-    // 이전 게임이 끝난 후 새로 참가하는 인원(ready가 false였던 인원)은 자동 ready
-    players.forEach(p => {
-      if (!p.ready) p.ready = true;
-    });
-    io.emit('players', players);
-    // ------------------------------------------------------
-
+    
     // 1. 숫자 뽑기
     const numbers = [];
     while (numbers.length < players.length) {
@@ -406,17 +396,15 @@ function startGameAfterCardExchange() {
   game.dalmutiCardSelected = false;
   game.archbishopCardSelected = false;
   
-  // 기존 참가자 + 관전자 모두에게 gameSetup 전송 (연결된 소켓만)
-  players.forEach((player) => {
-    if (io.sockets.sockets.has(player.id)) {
-      const idx = game.ordered.findIndex(p => p.nickname === player.nickname);
-      io.to(player.id).emit('gameSetup', {
-        ordered: game.ordered.map((p, i) => ({ ...p, cardCount: game.playerHands[i].length, finished: game.finished[i] })),
-        myCards: idx !== -1 ? game.playerHands[idx] : [],
-        turnInfo: { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx] },
-        field: game.lastPlay
-      });
-    }
+  // 바로 게임 세팅 데이터 전송
+  game.ordered.forEach((p, i) => {
+    console.log(`${p.nickname}에게 gameSetup 전송 - 카드 ${game.playerHands[i].length}장`);
+    io.to(p.id).emit('gameSetup', {
+      ordered: game.ordered.map((p, i) => ({ ...p, cardCount: game.playerHands[i].length, finished: game.finished[i] })),
+      myCards: game.playerHands[i],
+      turnInfo: { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx] },
+      field: game.lastPlay
+    });
   });
   console.log('gameSetup 데이터 전송 완료.');
   // 첫 턴 정보 브로드캐스트 및 타이머 시작
@@ -480,47 +468,99 @@ io.on('connection', (socket) => {
   socket.on('join', (nickname, callback) => {
     socket.nickname = nickname;
 
+    // --- 게임 재접속 및 데이터 전송 로직 ---
+    if (game.inProgress) {
+      const playerIndex = game.ordered.findIndex(p => p.nickname === nickname);
+      if (playerIndex !== -1) {
+        console.log(`게임 참가자 ${nickname}가 game.html에 연결했습니다.`);
+        console.log(`이전 소켓 ID: ${game.ordered[playerIndex].id}`);
+        console.log(`새로운 소켓 ID: ${socket.id}`);
+        
+        // 새로운 소켓 ID로 플레이어 정보 업데이트
+        game.ordered[playerIndex].id = socket.id;
+        const playerInLobbyList = players.find(p => p.nickname === nickname);
+        if (playerInLobbyList) playerInLobbyList.id = socket.id;
+
+        console.log(`소켓 ID 업데이트 완료: ${nickname} -> ${socket.id}`);
+        
+        // --- 재접속 시 상태에 따른 분기 처리 ---
+        if (game.cardExchangeInProgress) {
+          const dalmutiIdx = game.ordered.findIndex(p => p.role === '달무티');
+          const archbishopIdx = game.ordered.findIndex(p => p.role === '대주교');
+          const dalmuti = game.ordered[dalmutiIdx];
+          const archbishop = game.ordered[archbishopIdx];
+
+          if (playerIndex === dalmutiIdx) {
+            // 재접속한 플레이어가 '달무티'인 경우
+            console.log(`달무티 ${nickname} 재접속 - 카드 선택 요청을 다시 보냅니다.`);
+            setTimeout(() => { // 클라이언트가 준비될 시간을 줍니다.
+              io.to(socket.id).emit('selectCardsForSlave', {
+                message: '농노에게 줄 카드 2장을 선택하세요.',
+                hand: game.playerHands[playerIndex]
+              });
+            }, 500);
+          } else if (playerIndex === archbishopIdx) {
+            // 재접속한 플레이어가 '대주교'인 경우
+            console.log(`대주교 ${nickname} 재접속 - 카드 선택 요청을 다시 보냅니다.`);
+            setTimeout(() => { // 클라이언트가 준비될 시간을 줍니다.
+              io.to(socket.id).emit('selectCardsForMiner', {
+                message: '광부에게 줄 카드 1장을 선택하세요.',
+                hand: game.playerHands[playerIndex]
+              });
+            }, 500);
+          } else {
+            // 재접속한 플레이어가 다른 플레이어인 경우
+            console.log(`${nickname} 재접속 - 대기 화면을 표시합니다.`);
+            let waitingMessage = '';
+            if (dalmutiIdx !== -1 && archbishopIdx !== -1) {
+              waitingMessage = `${dalmuti.nickname}님과 ${archbishop.nickname}님이 카드 교환을 진행하고 있습니다...`;
+            } else if (dalmutiIdx !== -1) {
+              waitingMessage = `${dalmuti.nickname}님이 농노에게 줄 카드를 선택하고 있습니다...`;
+            } else if (archbishopIdx !== -1) {
+              waitingMessage = `${archbishop.nickname}님이 광부에게 줄 카드를 선택하고 있습니다...`;
+            }
+            
+            io.to(socket.id).emit('waitingForCardExchange', {
+              message: waitingMessage
+            });
+          }
+        } else {
+          // 카드 교환 단계가 아닐 때만 gameSetup 전송
+          io.to(socket.id).emit('gameSetup', {
+            ordered: game.ordered.map((p, i) => ({ ...p, cardCount: game.playerHands[i].length, finished: game.finished[i] })),
+            myCards: game.playerHands[playerIndex],
+            turnInfo: { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx] },
+            field: game.lastPlay
+          });
+        }
+        
+        return callback({ success: true, inGame: true });
+      }
+    }
+
+    // --- 로비 입장 로직 ---
     // 중복 닉네임 처리 (이미 로비에 있는 경우 소켓 ID만 업데이트)
     const existingPlayer = players.find(p => p.nickname === nickname);
     if (existingPlayer) {
       existingPlayer.id = socket.id;
-      // game.ordered에도 동기화
-      const orderedPlayer = game.ordered.find(p => p.nickname === nickname);
-      if (orderedPlayer) orderedPlayer.id = socket.id;
-      // Spectator reconnect: check if in ordered
-      const playerIndex = game.ordered.findIndex(p => p.nickname === nickname);
-      if (game.inProgress && playerIndex === -1) {
-        // 관전자 재입장: game.html 입장 허용, 관전자용 gameSetup 전송
-        io.to(socket.id).emit('gameSetup', {
-          ordered: game.ordered.map((p, i) => ({ ...p, cardCount: game.playerHands[i].length, finished: game.finished[i] })),
-          myCards: [],
-          turnInfo: { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx] },
-          field: game.lastPlay
-        });
-        return callback({ success: true, inGame: false, spectator: true });
+    } else {
+      if (players.length >= MAX_PLAYERS) {
+        return callback({ success: false, message: '최대 인원 초과' });
       }
-      return callback({ success: true });
+      if (players.length < MIN_PLAYERS - 1) {
+        // 최소 인원보다 적을 때는 자동으로 입장 허용
+        players.push({ id: socket.id, nickname, ready: false });
+      } else {
+        // 최소 인원에 도달했을 때는 게임 진행 중이 아닐 때만 입장 허용
+        if (!game.inProgress && !game.cardExchangeInProgress) {
+          players.push({ id: socket.id, nickname, ready: false });
+        } else {
+          return callback({ success: false, message: '게임이 진행 중입니다' });
+        }
+      }
     }
-
-    if (players.length >= MAX_PLAYERS) {
-      return callback({ success: false, message: '최대 인원 초과' });
-    }
-
-    // 게임 중에도 입장 허용 (관전자)
-    players.push({ id: socket.id, nickname, ready: false });
+    
     io.emit('players', players);
-
-    // game.html로 이동 안내 (클라이언트에서 처리)
-    if (game.inProgress) {
-      // 관전자용 gameSetup 전송
-      io.to(socket.id).emit('gameSetup', {
-        ordered: game.ordered.map((p, i) => ({ ...p, cardCount: game.playerHands[i].length, finished: game.finished[i] })),
-        myCards: [],
-        turnInfo: { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx] },
-        field: game.lastPlay
-      });
-      return callback({ success: true, inGame: false, spectator: true });
-    }
     callback({ success: true });
   });
 
