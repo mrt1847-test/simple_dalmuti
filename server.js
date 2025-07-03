@@ -412,17 +412,15 @@ function startGameAfterCardExchange() {
 let turnTimer = null;
 
 function startTurnTimer() {
-  if (turnTimer) clearTimeout(turnTimer);
+  clearTurnTimer();
+  if (!game.inProgress || game.finished[game.turnIdx]) return;
   turnTimer = setTimeout(() => {
-    // 현재 턴의 플레이어가 아직 행동하지 않았다면 자동 패스
     const currentPlayer = game.ordered[game.turnIdx];
     if (!game.finished[game.turnIdx]) {
-      io.to(currentPlayer.id).emit('turnTimeout'); // 클라이언트에 알림
-      // 서버에서 자동 패스 처리
-      // passTurn 로직을 직접 호출
+      io.to(currentPlayer.id).emit('turnTimeout');
       autoPassTurn(currentPlayer.id);
     }
-  }, 30000); // 30초
+  }, 30000);
 }
 
 function clearTurnTimer() {
@@ -431,11 +429,11 @@ function clearTurnTimer() {
 }
 
 function autoPassTurn(socketId) {
+  clearTurnTimer();
   const idx = game.ordered.findIndex(p => p.id === socketId);
   if (!game.inProgress || idx !== game.turnIdx || game.finished[idx]) return;
   game.passes++;
   io.emit('passResult', {playerIdx: idx, passes: game.passes});
-  // 현재 게임에 참여 중인(완주하지 않은) 플레이어 수 계산
   const activePlayersCount = players.length - game.finished.filter(f => f).length;
   if (game.passes >= activePlayersCount-1 && activePlayersCount > 1) {
     game.passes = 0;
@@ -451,8 +449,7 @@ function autoPassTurn(socketId) {
     io.emit('newRound', {turnIdx: game.turnIdx, lastPlay: null, currentPlayer: game.ordered[game.turnIdx]});
     startTurnTimer();
   } else if (activePlayersCount === 1) {
-    // 플레이어가 1명만 남은 경우, 패스할 수 없고 카드를 내야 함
-    // 패스 처리는 하지 않고 턴을 그대로 유지
+    // Only one player left, do nothing
   } else {
     do {
       game.turnIdx = (game.turnIdx + 1) % game.ordered.length;
@@ -607,13 +604,14 @@ io.on('connection', (socket) => {
     players = players.filter(p => p.id !== socket.id);
     io.emit('players', players);
     // 모든 유저가 나가면 게임 상태도 초기화
-    if (players.length === 0) {
+    if (players.length === 1) {
       resetGame();
     }
   });
 
   // --- 인게임 플레이 로직 ---
   socket.on('playCards', (cards, cb) => {
+    clearTurnTimer();
     const idx = game.ordered.findIndex(p => p.id === socket.id);
 
     if (!game.inProgress || idx !== game.turnIdx || game.finished[idx]) {
@@ -680,7 +678,6 @@ io.on('connection', (socket) => {
 
     console.log('`finished` array state:', JSON.stringify(game.finished));
     
-    clearTurnTimer();
     io.emit('playResult', {
       playerIdx: idx, 
       cards, 
@@ -762,9 +759,9 @@ io.on('connection', (socket) => {
   });
   
   socket.on('passTurn', (cb) => {
+    clearTurnTimer();
     const idx = game.ordered.findIndex(p => p.id === socket.id);
     if (!game.inProgress || idx !== game.turnIdx || game.finished[idx]) return;
-    clearTurnTimer();
     game.passes++;
     io.emit('passResult', {playerIdx: idx, passes: game.passes});
 

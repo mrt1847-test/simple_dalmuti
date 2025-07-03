@@ -21,7 +21,7 @@
     #mainWrap {
       display: flex;
       flex-direction: row;
-      justify-content: flex-center;
+      justify-content: center;
       align-items: flex-start;
       flex-wrap: wrap;
       width: 100%;
@@ -400,6 +400,37 @@
         }
       }
 
+      // --- 턴 타이머 UI 동기화 ---
+      function syncTurnTimer() {
+        if (turnInfo && turnInfo.currentPlayer && turnInfo.currentPlayer.id === socket.id) {
+          startTurnCountdown();
+        } else {
+          stopTurnCountdown();
+        }
+      }
+
+      socket.on('turnChanged', (data) => {
+        turnInfo = data;
+        renderGame();
+        syncTurnTimer();
+      });
+      socket.on('newRound', (data) => {
+        turnInfo = data;
+        field = null;
+        appendChat('🔄 새로운 라운드가 시작됩니다!', false, true);
+        renderGame();
+        syncTurnTimer();
+      });
+      socket.on('playResult', (data) => {
+        // ... existing code ...
+        renderGame();
+        syncTurnTimer();
+      });
+      socket.on('turnTimeout', () => {
+        appendChat('⏰ 제한시간이 초과되어 자동으로 패스 처리되었습니다.', false, true);
+        stopTurnCountdown();
+      });
+
       // 게임 초기 설정 이벤트 핸들러
       socket.on('gameSetup', (data) => {
         console.log('=== gameSetup 이벤트 수신 ===');
@@ -703,11 +734,7 @@
         console.log('차례 변경:', data);
         turnInfo = data;
         renderGame();
-        if (turnInfo && turnInfo.currentPlayer && turnInfo.currentPlayer.id === socket.id) {
-          startTurnCountdown();
-        } else {
-          stopTurnCountdown();
-        }
+        syncTurnTimer();
       });
 
       // 카드 제출 결과
@@ -743,11 +770,7 @@
 
         appendChat(`🎴 ${player.nickname}님이 ${cards}를 냈습니다.`, false, true);
         renderGame();
-        if (turnInfo && turnInfo.currentPlayer && turnInfo.currentPlayer.id === socket.id) {
-          startTurnCountdown();
-        } else {
-          stopTurnCountdown();
-        }
+        syncTurnTimer();
       });
 
       // 패스 결과
@@ -764,11 +787,7 @@
         field = null; // 필드 초기화
         appendChat('🔄 새로운 라운드가 시작됩니다!', false, true);
         renderGame();
-        if (turnInfo && turnInfo.currentPlayer && turnInfo.currentPlayer.id === socket.id) {
-          startTurnCountdown();
-        } else {
-          stopTurnCountdown();
-        }
+        syncTurnTimer();
       });
 
       // 게임 종료 및 점수
@@ -864,11 +883,6 @@
         localStorage.clear();
         sessionStorage.clear();
         location.reload();
-      });
-
-      socket.on('turnTimeout', () => {
-        appendChat('⏰ 제한시간이 초과되어 자동으로 패스 처리되었습니다.', false, true);
-        stopTurnCountdown();
       });
     });
   </script>
