@@ -683,6 +683,34 @@ io.on('connection', (socket) => {
     game.lastPlay = {count: cards.length, number: num, playerIdx: idx};
     game.passes = 0;
 
+    // 1 또는 1+조커를 낸 경우: 즉시 모든 미완주 플레이어 패스 처리 및 라운드 리셋
+    if (num === 1) {
+      // 현재 턴을 제외한 미완주 플레이어 인덱스
+      const activeIdxs = game.ordered.map((p, i) => i).filter(i => i !== idx && !game.finished[i]);
+      activeIdxs.forEach(i => {
+        io.emit('passResult', {playerIdx: i, passes: game.passes + 1});
+      });
+      // 라운드 리셋
+      game.passes = 0;
+      game.turnIdx = idx;
+      game.lastPlay = null;
+      setTimeout(() => {
+        io.emit('newRound', {turnIdx: game.turnIdx, lastPlay: null, currentPlayer: game.ordered[game.turnIdx]});
+        startTurnTimer();
+      }, 400); // 약간의 딜레이로 클라가 playResult를 먼저 받게 함
+      // playResult 이후의 턴 진행 로직은 여기서 종료
+      clearTurnTimer();
+      io.emit('playResult', {
+        playerIdx: idx, 
+        cards, 
+        lastPlay: {count: cards.length, number: num, playerIdx: idx},
+        finished: game.finished,
+        playerHands: game.playerHands.map(hand => hand.length)
+      });
+      cb && cb({success: true});
+      return;
+    }
+
     console.log(`Hand of ${game.ordered[idx].nickname} AFTER play: ${hand.length} cards`);
     console.log('All hands AFTER play:', JSON.stringify(game.playerHands.map(h => h.length)));
     
