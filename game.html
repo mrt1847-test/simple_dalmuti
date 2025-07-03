@@ -225,12 +225,6 @@
         }, 1000);
       }
 
-      function stopTurnCountdown() {
-        clearInterval(turnCountdown);
-        const timerDiv = document.getElementById('turnTimer');
-        if (timerDiv) timerDiv.textContent = '';
-      }
-
       function updateTurnTimerUI() {
         const timerDiv = document.getElementById('turnTimer');
         if (timerDiv) {
@@ -901,10 +895,8 @@
       });
 
       socket.on('timerStatus', (data) => {
+        console.log('[timerStatus] 이벤트 수신:', data, '-> timerEnabled:', data.enabled);
         timerEnabled = data.enabled;
-        if (!timerEnabled) {
-          stopTurnCountdown();
-        }
         updateTurnTimerUI();
       });
     });

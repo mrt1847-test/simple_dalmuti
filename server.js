@@ -592,12 +592,14 @@ io.on('connection', (socket) => {
   socket.on('chat', (msg) => {
     if (msg === '!타이머 off') {
       timerEnabled = false;
+      io.emit('timerStatus', { enabled: false });
       io.emit('chat', {nickname: 'SYSTEM', msg: '⏰ 턴 제한시간이 꺼졌습니다.'});
       clearTurnTimer();
       return;
     }
     if (msg === '!타이머 on') {
       timerEnabled = true;
+      io.emit('timerStatus', { enabled: true });
       io.emit('chat', {nickname: 'SYSTEM', msg: '⏰ 턴 제한시간이 켜졌습니다.'});
       startTurnTimer();
       return;
