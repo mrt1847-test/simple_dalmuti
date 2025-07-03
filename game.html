@@ -25,21 +25,22 @@
       align-items: flex-start;
       flex-wrap: wrap;
       width: 100%;
+      gap: 2vw;
+      padding-right: 2vw;
+      box-sizing: border-box;
     }
     #gameArea {
+      flex: 2 1 0;
       min-width: 420px;
       max-width: 600px;
+      box-sizing: border-box;
     }
     #chatWrap {
-      width: 380px; /* 기존 260px → 380px */
+      flex: 1 1 0;
       min-width: 300px;
-      margin-left: 3em; /* 더 넓게 */
-      background: #fff;
-      border-radius: 10px;
-      box-shadow: 0 1px 8px rgba(0,0,0,0.08);
-      display: flex;
-      flex-direction: column;
-      height: 540px;
+      max-width: 500px;
+      margin-right: 2vw;
+      box-sizing: border-box;
     }
     #chatMessages { flex: 1; overflow-y: auto; padding: 1em; font-size: 1em; display: flex; flex-direction: column; }
     #chatInputWrap { display: flex; border-top: 1px solid #eee; }
@@ -68,10 +69,7 @@
       
       /* 핸드 카드 영역 최적화 - 8장 이상일 때 두 줄로 */
       #handArea { 
-        flex-wrap: wrap !important; 
-        justify-content: center !important; 
-        gap: 5px !important;
-        max-width: 400px !important;
+        /* 원래대로 복구: flex-wrap, max-width, gap 등 제거 */
       }
       
       /* 필드 카드 크기 조정 */
@@ -97,9 +95,7 @@
       
       /* 핸드 카드 영역 더 작은 화면에서 최적화 */
       #handArea { 
-        max-width: 100% !important; 
-        gap: 3px !important;
-        flex-wrap: wrap !important;
+        /* 원래대로 복구: flex-wrap, max-width, gap 등 제거 */
       }
       
       /* 필드 카드 더 작게 */
@@ -146,10 +142,13 @@
       box-sizing: border-box;
       margin: 0 auto 10px auto;
       overflow: visible;
-      flex-wrap: wrap; /* 10장 넘으면 다음 줄로 */
-      gap: 8px;
-      max-width: 420px;
-      justify-content: center;
+      max-width: 100%;
+    }
+    @media (max-width: 900px) {
+      #mainWrap { flex-direction: column; gap: 0; padding-right: 0; }
+      #chatWrap { margin-right: 0; max-width: 100%; min-width: 0; }
+      #gameArea { max-width: 100%; min-width: 0; }
+      #handArea { max-width: 100vw; }
     }
   </style>
 </head>
