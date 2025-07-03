@@ -208,6 +208,11 @@
       let timerEnabled = true; // 서버에서 타이머 상태를 받으면 갱신됨
 
       function startTurnCountdown() {
+        if (!timerEnabled) {
+          stopTurnCountdown();
+          updateTurnTimerUI();
+          return;
+        }
         clearInterval(turnCountdown);
         turnTimeLeft = 30;
         updateTurnTimerUI();
@@ -410,6 +415,11 @@
 
       // --- 턴 타이머 UI 동기화 ---
       function syncTurnTimer() {
+        if (!timerEnabled) {
+          stopTurnCountdown();
+          updateTurnTimerUI();
+          return;
+        }
         if (turnInfo && turnInfo.currentPlayer && turnInfo.currentPlayer.id === socket.id) {
           startTurnCountdown();
         } else {
