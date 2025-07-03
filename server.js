@@ -88,10 +88,20 @@ function startGameIfReady() {
     return;
   }
 
+  // 참가자 선정: 최대 8명까지 참가, 나머지는 관전자
+  // (여기서는 players 전체가 참가자로 가정, 관전자 큐가 있다면 분리 필요)
   if (players.length >= MIN_PLAYERS && players.length <= MAX_PLAYERS && players.every(p => p.ready)) {
     console.log('게임 시작 조건 충족! 데이터 준비 중...');
     game.inProgress = true;
-    
+
+    // --- spectator에서 참가자로 승격된 인원 자동 ready 처리 ---
+    // 이전 게임이 끝난 후 새로 참가하는 인원(ready가 false였던 인원)은 자동 ready
+    players.forEach(p => {
+      if (!p.ready) p.ready = true;
+    });
+    io.emit('players', players);
+    // ------------------------------------------------------
+
     // 1. 숫자 뽑기
     const numbers = [];
     while (numbers.length < players.length) {
