@@ -6,10 +6,29 @@
   <title>달무티 게임</title>
   <style>
     body { display: flex; justify-content: center; align-items: center; height: 100vh; background: #f5f5dc; }
-    #mainWrap { display: flex; flex-direction: row; justify-content: center; align-items: flex-start; }
-    #gameArea { min-width: 420px; }
-    #chatWrap { width: 260px; margin-left: 2em; background: #fff; border-radius: 10px; box-shadow: 0 1px 8px rgba(0,0,0,0.08); display: flex; flex-direction: column; height: 540px; }
-    #chatMessages { flex: 1; overflow-y: auto; padding: 1em; font-size: 1em; }
+    #mainWrap {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      align-items: flex-start;
+      flex-wrap: wrap; /* 줄바꿈 허용 */
+    }
+    #gameArea {
+      min-width: 420px;
+      max-width: 600px;
+    }
+    #chatWrap {
+      width: 380px; /* 기존 260px → 380px */
+      min-width: 300px;
+      margin-left: 3em; /* 더 넓게 */
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 8px rgba(0,0,0,0.08);
+      display: flex;
+      flex-direction: column;
+      height: 540px;
+    }
+    #chatMessages { flex: 1; overflow-y: auto; padding: 1em; font-size: 1em; display: flex; flex-direction: column; }
     #chatInputWrap { display: flex; border-top: 1px solid #eee; }
     #chatInput { flex: 1 1 auto; min-width: 0; border: none; padding: 0.7em; font-size: 1em; border-radius: 0 0 0 10px; }
     #chatSend { width: 56px; border: none; background: #8bc34a; color: #fff; font-size: 1em; border-radius: 0 0 10px 0; cursor: pointer; }
@@ -18,9 +37,9 @@
     /* 모바일 대응 */
     @media (max-width: 768px) {
       body { height: auto; min-height: 100vh; padding: 10px; }
-      #mainWrap { flex-direction: column; align-items: center; }
+      #mainWrap { flex-direction: column; align-items: center; flex-wrap: nowrap; }
       #gameArea { min-width: auto; width: 100%; max-width: 400px; }
-      #chatWrap { width: 100%; max-width: 400px; margin-left: 0; margin-top: 1em; height: 300px; }
+      #chatWrap { width: 100%; max-width: 400px; min-width: 0; margin-left: 0; margin-top: 1em; height: 300px; }
       
       /* 타이틀과 원탁 사이 간격 조정 */
       h1 { margin-bottom: 1.5em !important; }
@@ -72,11 +91,48 @@
       /* 필드 카드 더 작게 */
       #gameContent div[style*="width:80px;height:130px"] { width: 50px !important; height: 75px !important; }
     }
+
+    /* 채팅 말풍선 스타일 */
+    .chat-bubble {
+      display: inline-block;
+      padding: 0.5em 1em;
+      border-radius: 18px;
+      margin: 0.2em 0;
+      max-width: 80%;
+      word-break: break-all;
+      font-size: 1em;
+      position: relative;
+    }
+    .chat-bubble.user {
+      background: #e0f7fa;
+      color: #222;
+      text-align: left;
+      margin-left: 1em;
+      align-self: flex-start;
+    }
+    .chat-bubble.mine {
+      background: #ffd180;
+      color: #222;
+      text-align: right;
+      margin-right: 1em;
+      align-self: flex-end;
+    }
+    .chat-bubble.system {
+      background: #f5f5f5;
+      color: #888;
+      text-align: center;
+      font-style: italic;
+      margin: 0.5em auto;
+      align-self: center;
+    }
   </style>
 </head>
 <body>
   <div id="mainWrap">
     <div id="gameArea">
+      <div style="text-align:right; margin-bottom: 0.5em;">
+        <button id="leaveGameBtn" style="padding:0.5em 1.2em;font-size:1em;background:#e57373;color:white;border:none;border-radius:8px;cursor:pointer;">게임 나가기</button>
+      </div>
       <h1 style="text-align:center;margin-bottom:2em;">달무티 게임</h1>
       <div id="gameContent"></div>
     </div>
@@ -318,7 +374,7 @@
       // 카드 교환 이벤트 핸들러
       socket.on('cardExchange', (data) => {
         console.log('카드 교환 완료:', data);
-        appendChat(`🔄 카드 교환 완료`, false);
+        appendChat(`🔄 카드 교환 완료`, false, true);
       });
 
       // 달무티 카드 선택 요청 이벤트
@@ -404,7 +460,7 @@
                 alert(res.message);
               } else {
                 isCardSelectionMode = false;
-                appendChat('✅ 카드 선택이 완료되었습니다.', true);
+                appendChat('✅ 카드 선택이 완료되었습니다.', false, true);
               }
             });
           };
@@ -496,7 +552,7 @@
                 alert(res.message);
               } else {
                 isCardSelectionMode = false;
-                appendChat('✅ 카드 선택이 완료되었습니다.', true);
+                appendChat('✅ 카드 선택이 완료되었습니다.', false, true);
               }
             });
           };
@@ -512,7 +568,7 @@
         console.log('현재 소켓 ID:', socket.id);
         console.log('현재 닉네임:', nickname);
         
-        appendChat(`⏳ ${data.message}`, false);
+        appendChat(`⏳ ${data.message}`, false, true);
         
         // 대기 화면 표시
         const gameContent = document.getElementById('gameContent');
@@ -537,7 +593,7 @@
         console.log('현재 소켓 ID:', socket.id);
         console.log('현재 닉네임:', nickname);
         
-        appendChat(`⏳ ${data.message}`, false);
+        appendChat(`⏳ ${data.message}`, false, true);
         
         // 대기 화면 표시
         const gameContent = document.getElementById('gameContent');
@@ -617,10 +673,10 @@
         
         // 완주한 플레이어 체크
         if (data.finished[data.playerIdx]) {
-          appendChat(`🏁 ${player.nickname}님이 완주했습니다!`, false);
+          appendChat(`🏁 ${player.nickname}님이 완주했습니다!`, false, true);
         }
 
-        appendChat(`🎴 ${player.nickname}님이 ${cards}를 냈습니다.`, false);
+        appendChat(`🎴 ${player.nickname}님이 ${cards}를 냈습니다.`, false, true);
         renderGame();
       });
 
@@ -628,7 +684,7 @@
       socket.on('passResult', (data) => {
         console.log('패스 결과:', data);
         const player = ordered[data.playerIdx];
-        appendChat(`⏭️ ${player.nickname}님이 패스했습니다. (${data.passes}번째 패스)`, false);
+        appendChat(`⏭️ ${player.nickname}님이 패스했습니다. (${data.passes}번째 패스)`, false, true);
       });
 
       // 새로운 라운드 시작
@@ -636,7 +692,7 @@
         console.log('새 라운드:', data);
         turnInfo = data;
         field = null; // 필드 초기화
-        appendChat('🔄 새로운 라운드가 시작됩니다!', false);
+        appendChat('🔄 새로운 라운드가 시작됩니다!', false, true);
         renderGame();
       });
 
@@ -660,7 +716,7 @@
         html += '<p style="text-align:center;">잠시 후 다음 게임을 시작합니다...</p>';
         gameContent.innerHTML = html;
 
-        appendChat('🎉 게임이 종료되었습니다!', false);
+        appendChat('🎉 게임이 종료되었습니다!', false, true);
       });
 
       // 최종 결과 (5판 완료)
@@ -686,18 +742,17 @@
 
         gameContent.innerHTML = html;
 
-        appendChat('🎊 5판 완료! 최종 결과입니다!', false);
+        appendChat('🎊 5판 완료! 최종 결과입니다!', false, true);
       });
 
       // 채팅 기능
       const chatMessages = document.getElementById('chatMessages');
       const chatInput = document.getElementById('chatInput');
       const chatSend = document.getElementById('chatSend');
-      function appendChat(msg, isMine) {
+      function appendChat(msg, isMine, isSystem) {
         const div = document.createElement('div');
+        div.className = 'chat-bubble' + (isSystem ? ' system' : isMine ? ' mine' : ' user');
         div.textContent = msg;
-        div.style.margin = '0.2em 0';
-        if (isMine) div.style.textAlign = 'right';
         chatMessages.appendChild(div);
         chatMessages.scrollTop = chatMessages.scrollHeight;
       }
@@ -715,9 +770,25 @@
         // 서버로부터 받은 메시지를 화면에 표시
         if (typeof data === 'object' && data.nickname && data.msg) {
             const isMine = data.nickname === nickname;
-            const prefix = isMine ? '나' : data.nickname;
-            appendChat(`${prefix}: ${data.msg}`, isMine);
+            // 시스템 메시지 아님
+            appendChat(`${isMine ? '나' : data.nickname}: ${data.msg}`, isMine, false);
         }
+      });
+
+      // --- 게임 나가기 버튼 이벤트 ---
+      const leaveBtn = document.getElementById('leaveGameBtn');
+      if (leaveBtn) {
+        leaveBtn.addEventListener('click', function() {
+          if (confirm('정말 게임을 나가시겠습니까?')) {
+            socket.emit('leaveGame');
+          }
+        });
+      }
+      // --- resetClient 이벤트 처리 ---
+      socket.on('resetClient', () => {
+        localStorage.clear();
+        sessionStorage.clear();
+        location.reload();
       });
     });
   </script>

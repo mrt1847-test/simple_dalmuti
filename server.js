@@ -549,6 +549,12 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('leaveGame', () => {
+    socket.emit('resetClient');
+    players = players.filter(p => p.id !== socket.id);
+    io.emit('players', players);
+  });
+
   // --- 인게임 플레이 로직 ---
   socket.on('playCards', (cards, cb) => {
     const idx = game.ordered.findIndex(p => p.id === socket.id);
