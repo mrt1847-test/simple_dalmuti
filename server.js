@@ -407,25 +407,22 @@ function startGameAfterCardExchange() {
     });
   });
   console.log('gameSetup 데이터 전송 완료.');
-  // 첫 턴 정보 브로드캐스트 및 타이머 시작
-  io.emit('turnChanged', { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx] });
-  startTurnTimer();
 }
 
-let timerEnabled = true; // 타이머 on/off 상태
 let turnTimer = null;
 
 function startTurnTimer() {
-  clearTurnTimer();
-  if (!timerEnabled) return;
-  if (!game.inProgress || game.finished[game.turnIdx]) return;
+  if (turnTimer) clearTimeout(turnTimer);
   turnTimer = setTimeout(() => {
+    // 현재 턴의 플레이어가 아직 행동하지 않았다면 자동 패스
     const currentPlayer = game.ordered[game.turnIdx];
     if (!game.finished[game.turnIdx]) {
-      io.to(currentPlayer.id).emit('turnTimeout');
+      io.to(currentPlayer.id).emit('turnTimeout'); // 클라이언트에 알림
+      // 서버에서 자동 패스 처리
+      // passTurn 로직을 직접 호출
       autoPassTurn(currentPlayer.id);
     }
-  }, 30000);
+  }, 30000); // 30초
 }
 
 function clearTurnTimer() {
@@ -434,11 +431,11 @@ function clearTurnTimer() {
 }
 
 function autoPassTurn(socketId) {
-  clearTurnTimer();
   const idx = game.ordered.findIndex(p => p.id === socketId);
   if (!game.inProgress || idx !== game.turnIdx || game.finished[idx]) return;
   game.passes++;
   io.emit('passResult', {playerIdx: idx, passes: game.passes});
+  // 현재 게임에 참여 중인(완주하지 않은) 플레이어 수 계산
   const activePlayersCount = players.length - game.finished.filter(f => f).length;
   if (game.passes >= activePlayersCount-1 && activePlayersCount > 1) {
     game.passes = 0;
@@ -454,7 +451,8 @@ function autoPassTurn(socketId) {
     io.emit('newRound', {turnIdx: game.turnIdx, lastPlay: null, currentPlayer: game.ordered[game.turnIdx]});
     startTurnTimer();
   } else if (activePlayersCount === 1) {
-    // Only one player left, do nothing
+    // 플레이어가 1명만 남은 경우, 패스할 수 없고 카드를 내야 함
+    // 패스 처리는 하지 않고 턴을 그대로 유지
   } else {
     do {
       game.turnIdx = (game.turnIdx + 1) % game.ordered.length;
@@ -590,20 +588,6 @@ io.on('connection', (socket) => {
   });
 
   socket.on('chat', (msg) => {
-    if (msg === '!타이머 off') {
-      timerEnabled = false;
-      io.emit('timerStatus', { enabled: false });
-      io.emit('chat', {nickname: 'SYSTEM', msg: '⏰ 턴 제한시간이 꺼졌습니다.'});
-      clearTurnTimer();
-      return;
-    }
-    if (msg === '!타이머 on') {
-      timerEnabled = true;
-      io.emit('timerStatus', { enabled: true });
-      io.emit('chat', {nickname: 'SYSTEM', msg: '⏰ 턴 제한시간이 켜졌습니다.'});
-      startTurnTimer();
-      return;
-    }
     io.emit('chat', {nickname: socket.nickname, msg});
   });
 
@@ -630,7 +614,6 @@ io.on('connection', (socket) => {
 
   // --- 인게임 플레이 로직 ---
   socket.on('playCards', (cards, cb) => {
-    clearTurnTimer();
     const idx = game.ordered.findIndex(p => p.id === socket.id);
 
     if (!game.inProgress || idx !== game.turnIdx || game.finished[idx]) {
@@ -697,13 +680,13 @@ io.on('connection', (socket) => {
 
     console.log('`finished` array state:', JSON.stringify(game.finished));
     
+    clearTurnTimer();
     io.emit('playResult', {
       playerIdx: idx, 
       cards, 
       lastPlay: game.lastPlay, 
       finished: game.finished,
-      playerHands: game.playerHands.map(hand => hand.length),
-      ordered: game.ordered
+      playerHands: game.playerHands.map(hand => hand.length)
     });
     cb && cb({success: true});
 
@@ -779,9 +762,9 @@ io.on('connection', (socket) => {
   });
   
   socket.on('passTurn', (cb) => {
-    clearTurnTimer();
     const idx = game.ordered.findIndex(p => p.id === socket.id);
     if (!game.inProgress || idx !== game.turnIdx || game.finished[idx]) return;
+    clearTurnTimer();
     game.passes++;
     io.emit('passResult', {playerIdx: idx, passes: game.passes});
 
