@@ -594,17 +594,12 @@ io.on('connection', (socket) => {
       timerEnabled = false;
       io.emit('chat', {nickname: 'SYSTEM', msg: '⏰ 턴 제한시간이 꺼졌습니다.'});
       clearTurnTimer();
-      io.emit('timerStatus', { enabled: timerEnabled });
       return;
     }
     if (msg === '!타이머 on') {
       timerEnabled = true;
       io.emit('chat', {nickname: 'SYSTEM', msg: '⏰ 턴 제한시간이 켜졌습니다.'});
-      io.emit('timerStatus', { enabled: timerEnabled });
-      // 게임이 진행 중이고 카드 교환 단계가 아니면 타이머 시작
-      if (game.inProgress && !game.cardExchangeInProgress && !game.finished[game.turnIdx]) {
-        startTurnTimer();
-      }
+      startTurnTimer();
       return;
     }
     io.emit('chat', {nickname: socket.nickname, msg});
