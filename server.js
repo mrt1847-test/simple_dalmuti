@@ -12,7 +12,8 @@ const io = new Server(server, {
   }
 });
 
-const MAX_PLAYERS = 6;
+const MIN_PLAYERS = 4;
+const MAX_PLAYERS = 8;
 let players = [];
 
 // --- 게임 상태를 하나의 객체로 관리 ---
@@ -87,7 +88,7 @@ function startGameIfReady() {
     return;
   }
 
-  if (players.length > 1 && players.length <= MAX_PLAYERS && players.every(p => p.ready)) {
+  if (players.length >= MIN_PLAYERS && players.length <= MAX_PLAYERS && players.every(p => p.ready)) {
     console.log('게임 시작 조건 충족! 데이터 준비 중...');
     game.inProgress = true;
     
@@ -100,7 +101,19 @@ function startGameIfReady() {
     
     // 2. 신분 및 순서 배정
     let picked;
-    const roles = ['달무티', '대주교', '평민', '평민', '광부', '노예'].slice(0, players.length);
+    // 인원에 따른 신분 배정
+    let roles;
+    if (players.length === 4) {
+      roles = ['달무티', '대주교', '광부', '노예'];
+    } else if (players.length === 5) {
+      roles = ['달무티', '대주교', '평민', '광부', '노예'];
+    } else if (players.length === 6) {
+      roles = ['달무티', '대주교', '평민', '평민', '광부', '노예'];
+    } else if (players.length === 7) {
+      roles = ['달무티', '대주교', '평민', '평민', '평민', '광부', '노예'];
+    } else if (players.length === 8) {
+      roles = ['달무티', '대주교', '평민', '평민', '평민', '평민', '광부', '노예'];
+    }
     // 디버깅: players와 lastGameScores 매칭 상태 출력
     console.log('players:', players.map((p, i) => `${i}: ${p.nickname}`));
     console.log('lastGameScores:', game.lastGameScores);
@@ -153,8 +166,27 @@ function startGameIfReady() {
     const hands = Array(game.ordered.length).fill(null).map(() => []);
     let cardDealIndex = 0;
     
-    // 13장씩 라운드-로빈 방식으로 분배
-    for (let i = 0; i < 13; i++) {
+    // 인원에 따른 카드 배분
+    let baseCards, dalmutiExtraCards;
+    if (players.length === 4) {
+      baseCards = 20;
+      dalmutiExtraCards = 0;
+    } else if (players.length === 5) {
+      baseCards = 16;
+      dalmutiExtraCards = 0;
+    } else if (players.length === 6) {
+      baseCards = 13;
+      dalmutiExtraCards = 2; // 달무티만 15장
+    } else if (players.length === 7) {
+      baseCards = 11;
+      dalmutiExtraCards = 3; // 달무티만 14장
+    } else if (players.length === 8) {
+      baseCards = 10;
+      dalmutiExtraCards = 0;
+    }
+    
+    // 기본 카드 분배 (라운드-로빈 방식)
+    for (let i = 0; i < baseCards; i++) {
       for (let j = 0; j < game.ordered.length; j++) {
         if(deck[cardDealIndex]) {
           hands[j].push(deck[cardDealIndex++]);
@@ -162,7 +194,26 @@ function startGameIfReady() {
       }
     }
 
+    // 달무티에게 추가 카드 분배
     const dalmutiIdx = game.ordered.findIndex(p => p.role === '달무티');
+    if (dalmutiIdx !== -1 && dalmutiExtraCards > 0) {
+      for (let i = 0; i < dalmutiExtraCards; i++) {
+        if(deck[cardDealIndex]) {
+          hands[dalmutiIdx].push(deck[cardDealIndex++]);
+        }
+      }
+    }
+    
+    // 남은 카드가 있다면 달무티에게 분배 (기존 로직 유지)
+    if (dalmutiIdx !== -1) {
+      while(cardDealIndex < deck.length) {
+        if(deck[cardDealIndex]) {
+          hands[dalmutiIdx].push(deck[cardDealIndex++]);
+        } else {
+          cardDealIndex++; // 만약을 대비한 무한 루프 방지
+        }
+      }
+    }
     if (dalmutiIdx !== -1) {
       while(cardDealIndex < deck.length) {
         if(deck[cardDealIndex]) {
@@ -441,7 +492,17 @@ io.on('connection', (socket) => {
       if (players.length >= MAX_PLAYERS) {
         return callback({ success: false, message: '최대 인원 초과' });
       }
-      players.push({ id: socket.id, nickname, ready: false });
+      if (players.length < MIN_PLAYERS - 1) {
+        // 최소 인원보다 적을 때는 자동으로 입장 허용
+        players.push({ id: socket.id, nickname, ready: false });
+      } else {
+        // 최소 인원에 도달했을 때는 게임 진행 중이 아닐 때만 입장 허용
+        if (!game.inProgress && !game.cardExchangeInProgress) {
+          players.push({ id: socket.id, nickname, ready: false });
+        } else {
+          return callback({ success: false, message: '게임이 진행 중입니다' });
+        }
+      }
     }
     
     io.emit('players', players);
@@ -578,7 +639,19 @@ io.on('connection', (socket) => {
       }
       console.log('모든 플레이어가 완주했습니다! 게임 종료.');
       
-      const scores = [10, 8, 6, 5, 4, 3].slice(0, players.length);
+      // 인원에 따른 점수 배정
+      let scores;
+      if (players.length === 4) {
+        scores = [10, 8, 6, 4];
+      } else if (players.length === 5) {
+        scores = [10, 8, 6, 5, 4];
+      } else if (players.length === 6) {
+        scores = [10, 8, 6, 5, 4, 3];
+      } else if (players.length === 7) {
+        scores = [10, 8, 6, 5, 4, 3, 2];
+      } else if (players.length === 8) {
+        scores = [10, 8, 6, 5, 4, 3, 2, 1];
+      }
       const result = game.finishOrder.map((playerIdx, i) => {
         const nickname = game.ordered[playerIdx].nickname;
         const role = game.ordered[playerIdx].role;
