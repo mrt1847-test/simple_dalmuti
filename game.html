@@ -906,6 +906,9 @@
 
       socket.on('timerStatus', (data) => {
         timerEnabled = data.enabled;
+        if (!timerEnabled) {
+          stopTurnCountdown();
+        }
         updateTurnTimerUI();
       });
     });
