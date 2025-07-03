@@ -623,7 +623,7 @@ io.on('connection', (socket) => {
     players = players.filter(p => p.id !== socket.id);
     io.emit('players', players);
     // 모든 유저가 나가면 게임 상태도 초기화
-    if (players.length === 0) {
+    if (players.length === 1) {
       resetGame();
     }
   });
