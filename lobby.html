@@ -8,12 +8,55 @@
     body { display: flex; justify-content: center; align-items: center; height: 100vh; background: #f5f5dc; }
     #mainWrap { display: flex; flex-direction: row; justify-content: center; align-items: flex-start; }
     #lobbyArea { min-width: 420px; }
-    #chatWrap { width: 260px; margin-left: 2em; background: #fff; border-radius: 10px; box-shadow: 0 1px 8px rgba(0,0,0,0.08); display: flex; flex-direction: column; height: 540px; }
-    #chatMessages { flex: 1; overflow-y: auto; padding: 1em; font-size: 1em; }
+    #chatWrap {
+      width: 380px;
+      min-width: 300px;
+      margin-left: 3em;
+      margin-right: 2vw;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 8px rgba(0,0,0,0.08);
+      display: flex;
+      flex-direction: column;
+      height: 540px;
+    }
+    #chatMessages { flex: 1; overflow-y: auto; padding: 1em; font-size: 1em; display: flex; flex-direction: column; }
     #chatInputWrap { display: flex; border-top: 1px solid #eee; }
     #chatInput { flex: 1 1 auto; min-width: 0; border: none; padding: 0.7em; font-size: 1em; border-radius: 0 0 0 10px; }
     #chatSend { width: 56px; border: none; background: #8bc34a; color: #fff; font-size: 1em; border-radius: 0 0 10px 0; cursor: pointer; }
     #chatSend:hover { background: #689f38; }
+    .chat-bubble {
+      display: inline-block;
+      padding: 0.5em 1em;
+      border-radius: 18px;
+      margin: 0.2em 0;
+      max-width: 80%;
+      word-break: break-all;
+      font-size: 1em;
+      position: relative;
+    }
+    .chat-bubble.user {
+      background: #e0f7fa;
+      color: #222;
+      text-align: left;
+      margin-left: 1em;
+      align-self: flex-start;
+    }
+    .chat-bubble.mine {
+      background: #ffd180;
+      color: #222;
+      text-align: right;
+      margin-right: 1em;
+      align-self: flex-end;
+    }
+    .chat-bubble.system {
+      background: #f5f5f5;
+      color: #888;
+      text-align: center;
+      font-style: italic;
+      margin: 0.5em auto;
+      align-self: center;
+    }
     button { padding: 0.7rem 2rem; font-size: 1.1rem; border-radius: 6px; border: none; background: #8bc34a; color: white; cursor: pointer; margin-top: 1em; }
     button:hover { background: #689f38; }
 
@@ -72,7 +115,7 @@
         <li>위의 과정을 반복해서 카드를 맨 처음 다 털어버리는 순서로 점수가 부여된다</li>
         <li>다음 게임은 전 게임의 순위로 신분이 배정된다.</li>
         <li>혁명은 복잡해서 구현 안할거다.</li>
-        <li>재밌게 즐기셨으면 커피 한잔 사주기기</li>
+        <li>재밌게 즐기셨으면 커피 한잔 사주기</li>
       </ul>
       <div style="font-size:0.95em;color:#888;">팁: <b>!타이머on</b> / <b>!타이머off</b>를 채팅에 입력해 타이머를 제어할 수 있습니다.</div>
     </div>
@@ -128,35 +171,33 @@
     socket.on('gameStart', () => {
       window.location.href = '/game.html';
     });
-          // 채팅 기능
-      const chatMessages = document.getElementById('chatMessages');
-      const chatInput = document.getElementById('chatInput');
-      const chatSend = document.getElementById('chatSend');
-      function appendChat(msg, isMine, isSystem) {
-        const div = document.createElement('div');
-        div.className = 'chat-bubble' + (isSystem ? ' system' : isMine ? ' mine' : ' user');
-        div.textContent = msg;
-        chatMessages.appendChild(div);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+    // 채팅 기능 (game.html과 동일하게)
+    const chatMessages = document.getElementById('chatMessages');
+    const chatInput = document.getElementById('chatInput');
+    const chatSend = document.getElementById('chatSend');
+    function appendChat(msg, isMine, isSystem) {
+      const div = document.createElement('div');
+      div.className = 'chat-bubble' + (isSystem ? ' system' : isMine ? ' mine' : ' user');
+      div.textContent = msg;
+      chatMessages.appendChild(div);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+    chatSend.onclick = sendChat;
+    chatInput.onkeydown = function(e) { if (e.key === 'Enter') sendChat(); };
+    function sendChat() {
+      const msg = chatInput.value.trim();
+      if (!msg) return;
+      socket.emit('chat', msg); // 서버로 메시지 전송만 함
+      chatInput.value = '';
+    }
+    socket.on('chat', (data) => {
+      // 서버로부터 받은 메시지를 화면에 표시
+      if (typeof data === 'object' && data.nickname && data.msg) {
+          const isMine = data.nickname === nickname;
+          // 시스템 메시지 아님
+          appendChat(`${isMine ? '나' : data.nickname}: ${data.msg}`, isMine, false);
       }
-      chatSend.onclick = sendChat;
-      chatInput.onkeydown = function(e) { if (e.key === 'Enter') sendChat(); };
-      
-      function sendChat() {
-        const msg = chatInput.value.trim();
-        if (!msg) return;
-        socket.emit('chat', msg); // 서버로 메시지 전송만 함
-        chatInput.value = '';
-      }
-
-      socket.on('chat', (data) => {
-        // 서버로부터 받은 메시지를 화면에 표시
-        if (typeof data === 'object' && data.nickname && data.msg) {
-            const isMine = data.nickname === nickname;
-            // 시스템 메시지 아님
-            appendChat(`${isMine ? '나' : data.nickname}: ${data.msg}`, isMine, false);
-        }
-      });
+    });
 
     // 도움말 버튼/모달
     document.getElementById('helpBtn').onclick = function() {
