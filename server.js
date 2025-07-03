@@ -594,11 +594,13 @@ io.on('connection', (socket) => {
     if (msg === '!타이머on') {
       timerEnabled = true;
       io.emit('chat', {nickname: 'SYSTEM', msg: '타이머가 켜졌습니다.'});
+      io.emit('timerStatus', { enabled: timerEnabled });
       return;
     }
     if (msg === '!타이머off') {
       timerEnabled = false;
       io.emit('chat', {nickname: 'SYSTEM', msg: '타이머가 꺼졌습니다.'});
+      io.emit('timerStatus', { enabled: timerEnabled });
       clearTurnTimer();
       return;
     }
