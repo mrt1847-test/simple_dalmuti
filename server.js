@@ -606,6 +606,10 @@ io.on('connection', (socket) => {
     socket.emit('resetClient');
     players = players.filter(p => p.id !== socket.id);
     io.emit('players', players);
+    // 모든 유저가 나가면 게임 상태도 초기화
+    if (players.length === 0) {
+      resetGame();
+    }
   });
 
   // --- 인게임 플레이 로직 ---

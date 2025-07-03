@@ -5,13 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>달무티 게임</title>
   <style>
-    body { display: flex; justify-content: center; align-items: center; height: 100vh; background: #f5f5dc; }
+    html, body {
+      height: auto;
+      min-height: 100vh;
+    }
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      height: auto;
+      min-height: 100vh;
+      background: #f5f5dc;
+      overflow-y: auto;
+    }
     #mainWrap {
       display: flex;
       flex-direction: row;
       justify-content: center;
       align-items: flex-start;
-      flex-wrap: wrap; /* 줄바꿈 허용 */
+      flex-wrap: wrap;
+      width: 100%;
     }
     #gameArea {
       min-width: 420px;
@@ -177,6 +190,39 @@
       let isCardSelectionMode = false; // 카드 선택 모드 플래그
       console.log('roleAssigned:', ordered);
 
+      let turnCountdown = null;
+      let turnTimeLeft = 30;
+
+      function startTurnCountdown() {
+        clearInterval(turnCountdown);
+        turnTimeLeft = 30;
+        updateTurnTimerUI();
+        turnCountdown = setInterval(() => {
+          turnTimeLeft--;
+          updateTurnTimerUI();
+          if (turnTimeLeft <= 0) {
+            clearInterval(turnCountdown);
+          }
+        }, 1000);
+      }
+
+      function stopTurnCountdown() {
+        clearInterval(turnCountdown);
+        const timerDiv = document.getElementById('turnTimer');
+        if (timerDiv) timerDiv.textContent = '';
+      }
+
+      function updateTurnTimerUI() {
+        const timerDiv = document.getElementById('turnTimer');
+        if (timerDiv) {
+          if (turnInfo && turnInfo.currentPlayer && turnInfo.currentPlayer.id === socket.id) {
+            timerDiv.textContent = `⏰ 남은 시간: ${turnTimeLeft}초`;
+          } else {
+            timerDiv.textContent = '';
+          }
+        }
+      }
+
       // 게임 화면 전체를 다시 그리는 함수
       function renderGame() {
         const gameContent = document.getElementById('gameContent');
@@ -251,6 +297,7 @@
             html += `현재 차례: <b>${turnInfo.currentPlayer.nickname}</b> (${turnInfo.currentPlayer.role})`;
           }
           html += '</div>';
+          html += '<div id="turnTimer" style="text-align:center;font-size:1.1em;margin-bottom:1em;"></div>';
         }
 
         // 4. 내 카드
@@ -643,6 +690,11 @@
         console.log('차례 변경:', data);
         turnInfo = data;
         renderGame();
+        if (turnInfo && turnInfo.currentPlayer && turnInfo.currentPlayer.id === socket.id) {
+          startTurnCountdown();
+        } else {
+          stopTurnCountdown();
+        }
       });
 
       // 카드 제출 결과
@@ -678,6 +730,11 @@
 
         appendChat(`🎴 ${player.nickname}님이 ${cards}를 냈습니다.`, false, true);
         renderGame();
+        if (turnInfo && turnInfo.currentPlayer && turnInfo.currentPlayer.id === socket.id) {
+          startTurnCountdown();
+        } else {
+          stopTurnCountdown();
+        }
       });
 
       // 패스 결과
@@ -694,6 +751,11 @@
         field = null; // 필드 초기화
         appendChat('🔄 새로운 라운드가 시작됩니다!', false, true);
         renderGame();
+        if (turnInfo && turnInfo.currentPlayer && turnInfo.currentPlayer.id === socket.id) {
+          startTurnCountdown();
+        } else {
+          stopTurnCountdown();
+        }
       });
 
       // 게임 종료 및 점수
@@ -789,6 +851,11 @@
         localStorage.clear();
         sessionStorage.clear();
         location.reload();
+      });
+
+      socket.on('turnTimeout', () => {
+        appendChat('⏰ 제한시간이 초과되어 자동으로 패스 처리되었습니다.', false, true);
+        stopTurnCountdown();
       });
     });
   </script>
