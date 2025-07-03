@@ -483,7 +483,10 @@ io.on('connection', (socket) => {
     // 중복 닉네임 처리 (이미 로비에 있는 경우 소켓 ID만 업데이트)
     const existingPlayer = players.find(p => p.nickname === nickname);
     if (existingPlayer) {
-      existingPlayer.id = socket.id; // 항상 최신 소켓 ID로 갱신
+      existingPlayer.id = socket.id;
+      // game.ordered에도 동기화
+      const orderedPlayer = game.ordered.find(p => p.nickname === nickname);
+      if (orderedPlayer) orderedPlayer.id = socket.id;
       // Spectator reconnect: check if in ordered
       const playerIndex = game.ordered.findIndex(p => p.nickname === nickname);
       if (game.inProgress && playerIndex === -1) {
