@@ -407,6 +407,9 @@ function startGameAfterCardExchange() {
     });
   });
   console.log('gameSetup 데이터 전송 완료.');
+  // 첫 턴 정보 브로드캐스트 및 타이머 시작
+  io.emit('turnChanged', { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx] });
+  startTurnTimer();
 }
 
 let timerEnabled = true; // 타이머 on/off 상태
@@ -591,12 +594,17 @@ io.on('connection', (socket) => {
       timerEnabled = false;
       io.emit('chat', {nickname: 'SYSTEM', msg: '⏰ 턴 제한시간이 꺼졌습니다.'});
       clearTurnTimer();
+      io.emit('timerStatus', { enabled: timerEnabled });
       return;
     }
     if (msg === '!타이머 on') {
       timerEnabled = true;
       io.emit('chat', {nickname: 'SYSTEM', msg: '⏰ 턴 제한시간이 켜졌습니다.'});
-      startTurnTimer();
+      io.emit('timerStatus', { enabled: timerEnabled });
+      // 게임이 진행 중이고 카드 교환 단계가 아니면 타이머 시작
+      if (game.inProgress && !game.cardExchangeInProgress && !game.finished[game.turnIdx]) {
+        startTurnTimer();
+      }
       return;
     }
     io.emit('chat', {nickname: socket.nickname, msg});

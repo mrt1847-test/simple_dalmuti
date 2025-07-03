@@ -455,6 +455,7 @@
         selected = [];
         
         renderGame();
+        syncTurnTimer(); // 카드 교환 완료 후 첫 턴에 타이머 시작
 
         // 5초 후에 숫자 정보 지우고 다시 그리기
         setTimeout(() => {
