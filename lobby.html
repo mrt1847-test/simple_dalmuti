@@ -59,11 +59,20 @@
       <h2 style="margin-top:0;">게임 도움말</h2>
       <ul style="font-size:1em;line-height:1.7;margin-bottom:1em;">
         <li>최소 4명, 최대 8명까지 참가할 수 있습니다.</li>
-        <li>게임 중에도 관전 및 채팅이 가능합니다.</li>
-        <li>게임이 끝나면 대기자는 자동으로 다음 게임에 참가합니다.</li>
-        <li>타이머 명령어: <b>!타이머on</b> (타이머 켜기), <b>!타이머off</b> (타이머 끄기)</li>
-        <li>카드 교환, 자동 패스, 점수 배정 등은 자동으로 처리됩니다.</li>
-        <li>게임 중 궁금한 점은 채팅으로 질문하세요!</li>
+        <li>계급에 따라 새롭게 자리를 배치한다. </li>
+        <li>각 계급은 자신보다 낮은 계급에게 이것저것 시킬 수 있다. 거부권은 없다.</li>
+        <li>농노는 왕에게 자신의 카드들 중 적힌 수가 가장 작은 카드 2장을 왕에게 조공으로 바친다. 물론 공손하게.</li>
+        <li>왕은 자신에게 가장 쓸모없을 것 같은 카드 2장을 농노에게 준다.</li>
+        <li>광부는 대주교에게 농노와 같은 방식으로 1장을 조공으로 바치고 대주교는 왕과 같은 방식으로 1장을 준다.</li>
+        <li>왕부터 시계방향으로 돌아가면서 카드를 내는데 규칙이 있다.</li>
+        <li>맨 처음 플레이어가 낸 카드의 개수만큼만 낼 수 있다.</li>  
+        <li>바로 전 플레이어가 낸 카드에 적혀있는 수보다 낮은 수의 카드만 낼 수 있다.</li>
+        <li>만약 카드를 낼 수 없다면 패스를 선언한다.</li>
+        <li>패스가 계속 선언되어서 한바퀴가 돌아서 맨 마지막 카드를 낸 플레이어의 차례가 되면 그 플래이어가 선으로 새로운 라운드를 시작한다.</li>
+        <li>위의 과정을 반복해서 카드를 맨 처음 다 털어버리는 순서로 점수가 부여된다</li>
+        <li>다음 게임은 전 게임의 순위로 신분이 배정된다.</li>
+        <li>혁명은 복잡해서 구현 안할거다.</li>
+        <li>재밌게 즐기셨으면 커피 한잔 사주기기</li>
       </ul>
       <div style="font-size:0.95em;color:#888;">팁: <b>!타이머on</b> / <b>!타이머off</b>를 채팅에 입력해 타이머를 제어할 수 있습니다.</div>
     </div>
@@ -119,34 +128,36 @@
     socket.on('gameStart', () => {
       window.location.href = '/game.html';
     });
-    // 채팅 기능
-    const chatMessages = document.getElementById('chatMessages');
-    const chatInput = document.getElementById('chatInput');
-    const chatSend = document.getElementById('chatSend');
-    function appendChat(msg, isMine) {
-      const div = document.createElement('div');
-      div.textContent = msg;
-      div.style.margin = '0.2em 0';
-      if (isMine) div.style.textAlign = 'right';
-      chatMessages.appendChild(div);
-      chatMessages.scrollTop = chatMessages.scrollHeight;
-    }
-    chatSend.onclick = sendChat;
-    chatInput.onkeydown = function(e) { if (e.key === 'Enter') sendChat(); };
-    function sendChat() {
-      const msg = chatInput.value.trim();
-      if (!msg) return;
-      socket.emit('chat', msg);
-      chatInput.value = '';
-    }
-    socket.on('chat', (data) => {
-      const nickname = localStorage.getItem('dalmuti_nickname');
-      if (typeof data === 'object' && data.nickname && data.msg) {
-          const isMine = data.nickname === nickname;
-          const prefix = isMine ? '나' : data.nickname;
-          appendChat(`${prefix}: ${data.msg}`, isMine);
+          // 채팅 기능
+      const chatMessages = document.getElementById('chatMessages');
+      const chatInput = document.getElementById('chatInput');
+      const chatSend = document.getElementById('chatSend');
+      function appendChat(msg, isMine, isSystem) {
+        const div = document.createElement('div');
+        div.className = 'chat-bubble' + (isSystem ? ' system' : isMine ? ' mine' : ' user');
+        div.textContent = msg;
+        chatMessages.appendChild(div);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
       }
-    });
+      chatSend.onclick = sendChat;
+      chatInput.onkeydown = function(e) { if (e.key === 'Enter') sendChat(); };
+      
+      function sendChat() {
+        const msg = chatInput.value.trim();
+        if (!msg) return;
+        socket.emit('chat', msg); // 서버로 메시지 전송만 함
+        chatInput.value = '';
+      }
+
+      socket.on('chat', (data) => {
+        // 서버로부터 받은 메시지를 화면에 표시
+        if (typeof data === 'object' && data.nickname && data.msg) {
+            const isMine = data.nickname === nickname;
+            // 시스템 메시지 아님
+            appendChat(`${isMine ? '나' : data.nickname}: ${data.msg}`, isMine, false);
+        }
+      });
+
     // 도움말 버튼/모달
     document.getElementById('helpBtn').onclick = function() {
       document.getElementById('helpModal').style.display = 'flex';
