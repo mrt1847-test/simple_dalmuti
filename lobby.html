@@ -37,6 +37,9 @@
 <body>
   <div id="mainWrap">
     <div id="lobbyArea">
+      <div style="text-align:right; margin-bottom:0.5em;">
+        <button id="helpBtn" style="background:#fff;color:#8bc34a;border:1px solid #8bc34a;padding:0.3em 1em;font-size:1em;border-radius:8px;cursor:pointer;float:right;">도움말</button>
+      </div>
       <h1>달무티 대기방</h1>
       <div id="players" style="margin-bottom:1.5rem;"></div>
       <button id="readyBtn">게임 준비</button>
@@ -48,6 +51,21 @@
         <input type="text" id="chatInput" placeholder="메시지 입력..." autocomplete="off" />
         <button id="chatSend">전송</button>
       </div>
+    </div>
+  </div>
+  <div id="helpModal" style="display:none;position:fixed;z-index:1000;left:0;top:0;width:100vw;height:100vh;background:rgba(0,0,0,0.35);justify-content:center;align-items:center;">
+    <div style="background:#fff;padding:2em 1.5em 1.5em 1.5em;border-radius:12px;max-width:400px;box-shadow:0 2px 16px rgba(0,0,0,0.18);position:relative;">
+      <button id="closeHelp" style="position:absolute;top:10px;right:10px;background:none;border:none;font-size:1.3em;cursor:pointer;color:#888;">✕</button>
+      <h2 style="margin-top:0;">게임 도움말</h2>
+      <ul style="font-size:1em;line-height:1.7;margin-bottom:1em;">
+        <li>최소 4명, 최대 8명까지 참가할 수 있습니다.</li>
+        <li>게임 중에도 관전 및 채팅이 가능합니다.</li>
+        <li>게임이 끝나면 대기자는 자동으로 다음 게임에 참가합니다.</li>
+        <li>타이머 명령어: <b>!타이머on</b> (타이머 켜기), <b>!타이머off</b> (타이머 끄기)</li>
+        <li>카드 교환, 자동 패스, 점수 배정 등은 자동으로 처리됩니다.</li>
+        <li>게임 중 궁금한 점은 채팅으로 질문하세요!</li>
+      </ul>
+      <div style="font-size:0.95em;color:#888;">팁: <b>!타이머on</b> / <b>!타이머off</b>를 채팅에 입력해 타이머를 제어할 수 있습니다.</div>
     </div>
   </div>
   <script src="/socket.io/socket.io.js"></script>
@@ -129,6 +147,13 @@
           appendChat(`${prefix}: ${data.msg}`, isMine);
       }
     });
+    // 도움말 버튼/모달
+    document.getElementById('helpBtn').onclick = function() {
+      document.getElementById('helpModal').style.display = 'flex';
+    };
+    document.getElementById('closeHelp').onclick = function() {
+      document.getElementById('helpModal').style.display = 'none';
+    };
   </script>
 </body>
 </html> 
