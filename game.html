@@ -21,26 +21,26 @@
     #mainWrap {
       display: flex;
       flex-direction: row;
-      justify-content: center;
+      justify-content: flex-end;
       align-items: flex-start;
       flex-wrap: wrap;
       width: 100%;
-      gap: 2vw;
-      padding-right: 2vw;
-      box-sizing: border-box;
     }
     #gameArea {
-      flex: 2 1 0;
       min-width: 420px;
-      max-width: 600px;
-      box-sizing: border-box;
+      max-width: 90vw;
     }
     #chatWrap {
-      flex: 1 1 0;
+      width: 380px;
       min-width: 300px;
-      max-width: 500px;
+      margin-left: 3em;
       margin-right: 2vw;
-      box-sizing: border-box;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 8px rgba(0,0,0,0.08);
+      display: flex;
+      flex-direction: column;
+      height: 540px;
     }
     #chatMessages { flex: 1; overflow-y: auto; padding: 1em; font-size: 1em; display: flex; flex-direction: column; }
     #chatInputWrap { display: flex; border-top: 1px solid #eee; }
@@ -142,13 +142,11 @@
       box-sizing: border-box;
       margin: 0 auto 10px auto;
       overflow: visible;
-      max-width: 100%;
     }
     @media (max-width: 900px) {
-      #mainWrap { flex-direction: column; gap: 0; padding-right: 0; }
-      #chatWrap { margin-right: 0; max-width: 100%; min-width: 0; }
-      #gameArea { max-width: 100%; min-width: 0; }
-      #handArea { max-width: 100vw; }
+      #mainWrap { flex-direction: column; justify-content: center; }
+      #chatWrap { margin-right: 0; margin-left: 0; max-width: 100%; min-width: 0; }
+      #gameArea { max-width: 90vw; min-width: 0; }
     }
   </style>
 </head>
