@@ -406,15 +406,17 @@ function startGameAfterCardExchange() {
   game.dalmutiCardSelected = false;
   game.archbishopCardSelected = false;
   
-  // 기존 참가자 + 관전자 모두에게 gameSetup 전송
+  // 기존 참가자 + 관전자 모두에게 gameSetup 전송 (연결된 소켓만)
   players.forEach((player) => {
-    const idx = game.ordered.findIndex(p => p.nickname === player.nickname);
-    io.to(player.id).emit('gameSetup', {
-      ordered: game.ordered.map((p, i) => ({ ...p, cardCount: game.playerHands[i].length, finished: game.finished[i] })),
-      myCards: idx !== -1 ? game.playerHands[idx] : [],
-      turnInfo: { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx] },
-      field: game.lastPlay
-    });
+    if (io.sockets.sockets.has(player.id)) {
+      const idx = game.ordered.findIndex(p => p.nickname === player.nickname);
+      io.to(player.id).emit('gameSetup', {
+        ordered: game.ordered.map((p, i) => ({ ...p, cardCount: game.playerHands[i].length, finished: game.finished[i] })),
+        myCards: idx !== -1 ? game.playerHands[idx] : [],
+        turnInfo: { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx] },
+        field: game.lastPlay
+      });
+    }
   });
   console.log('gameSetup 데이터 전송 완료.');
   // 첫 턴 정보 브로드캐스트 및 타이머 시작
@@ -481,7 +483,7 @@ io.on('connection', (socket) => {
     // 중복 닉네임 처리 (이미 로비에 있는 경우 소켓 ID만 업데이트)
     const existingPlayer = players.find(p => p.nickname === nickname);
     if (existingPlayer) {
-      existingPlayer.id = socket.id;
+      existingPlayer.id = socket.id; // 항상 최신 소켓 ID로 갱신
       // Spectator reconnect: check if in ordered
       const playerIndex = game.ordered.findIndex(p => p.nickname === nickname);
       if (game.inProgress && playerIndex === -1) {
