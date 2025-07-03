@@ -79,9 +79,24 @@
     };
     socket.on('players', (players) => {
       const playersDiv = document.getElementById('players');
-      playersDiv.innerHTML = `<b>입장 인원 (${players.length}/6)</b><ul style='padding-left:1.2em;'>` +
+      const readyBtn = document.getElementById('readyBtn');
+      
+      playersDiv.innerHTML = `<b>입장 인원 (${players.length}/8)</b><ul style='padding-left:1.2em;'>` +
         players.map(p => `<li>${p.nickname} ${p.ready ? '✅' : ''}</li>`).join('') +
         '</ul>';
+      
+      // 최소 4명 이상일 때만 게임 준비 가능
+      if (players.length < 4) {
+        readyBtn.disabled = true;
+        readyBtn.textContent = '최소 4명 필요';
+        readyBtn.style.background = '#ccc';
+      } else {
+        readyBtn.disabled = false;
+        if (!ready) {
+          readyBtn.textContent = '게임 준비';
+        }
+        readyBtn.style.background = '#8bc34a';
+      }
     });
     socket.on('gameStart', () => {
       window.location.href = '/game.html';
