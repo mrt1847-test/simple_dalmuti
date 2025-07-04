@@ -29,6 +29,17 @@
     </form>
   </div>
   <script>
+    // 쿼리스트링에서 nickname 추출
+    function getQueryParam(name) {
+      const url = new URL(window.location.href);
+      return url.searchParams.get(name);
+    }
+    const nicknameFromQuery = getQueryParam('nickname');
+    const nicknameInput = document.getElementById('roomNickname');
+    if (nicknameFromQuery) {
+      // 쿼리로 닉네임이 오면 입력란 숨김
+      if (nicknameInput) nicknameInput.style.display = 'none';
+    }
     async function fetchRooms() {
       const res = await fetch('/api/rooms');
       const rooms = await res.json();
@@ -46,16 +57,21 @@
       });
     }
     async function joinRoom(roomId) {
-      // 닉네임 입력 후 lobby.html로 이동 (roomId 쿼리)
-      const nickname = prompt('닉네임을 입력하세요 (중복 불가)');
+      let nickname = nicknameFromQuery;
+      if (!nickname) {
+        nickname = prompt('닉네임을 입력하세요 (중복 불가)');
+      }
       if (!nickname) return;
-      // 중복 닉네임 체크는 lobby.html에서 처리
       location.href = `lobby.html?roomId=${encodeURIComponent(roomId)}&nickname=${encodeURIComponent(nickname)}`;
     }
     document.getElementById('createRoomForm').onsubmit = async e => {
       e.preventDefault();
       const roomName = document.getElementById('roomName').value.trim();
-      if (!roomName) return;
+      let nickname = nicknameFromQuery;
+      if (!nickname) {
+        nickname = prompt('닉네임을 입력하세요 (중복 불가)');
+      }
+      if (!roomName || !nickname) return;
       const res = await fetch('/api/create-room', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -65,6 +81,8 @@
       if (data.success) {
         await fetchRooms();
         document.getElementById('roomName').value = '';
+        // 방 생성 후 바로 입장
+        location.href = `lobby.html?roomId=${encodeURIComponent(data.roomId)}&nickname=${encodeURIComponent(nickname)}`;
       } else {
         alert('방 생성 실패: ' + (data.message || '알 수 없는 오류'));
       }

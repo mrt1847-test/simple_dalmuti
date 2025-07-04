@@ -35,25 +35,12 @@
       <button type="submit">입장하기</button>
     </form>
   </div>
-  <script src="/socket.io/socket.io.js"></script>
   <script>
-    const socket = io("https://simple-dalmuti.onrender.com");
     document.getElementById('nicknameForm').addEventListener('submit', function(e) {
       e.preventDefault();
       const nickname = document.getElementById('nickname').value.trim();
       if(nickname) {
-        socket.emit('join', nickname, (res) => {
-          if(res.success) {
-            localStorage.setItem('dalmuti_nickname', nickname);
-            window.location.href = '/lobby.html';
-          } else {
-            if(res.message === '중복 닉네임') {
-              alert('중복 닉네임입니다. 다른 닉네임을 입력하세요.');
-            } else {
-              alert(res.message);
-            }
-          }
-        });
+        window.location.href = '/room-list.html?nickname=' + encodeURIComponent(nickname);
       }
     });
   </script>
