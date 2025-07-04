@@ -256,7 +256,10 @@ function startGameIfReady(roomId) {
       setTimeout(() => {
         // 혁명 선택 기회 부여
         const revPlayer = rooms[roomId].game.ordered[joker2Idx];
-        io.to(revPlayer.id).emit('revolutionChoice');
+        io.to(revPlayer.id).emit('revolutionChoice', {
+          role: revPlayer.role,
+          nickname: revPlayer.nickname
+        });
         // 나머지 플레이어들은 대기 메시지
         rooms[roomId].game.ordered.forEach((p, i) => {
           if (i !== joker2Idx) {

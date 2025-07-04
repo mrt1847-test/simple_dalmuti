@@ -1052,13 +1052,16 @@
       });
 
       // 혁명 선택 요청 이벤트
-      socket.on('revolutionChoice', () => {
-        console.log('=== revolutionChoice 이벤트 수신 ===');
+      socket.on('revolutionChoice', (data) => {
+        console.log('=== revolutionChoice 이벤트 수신 ===', data);
         isCardSelectionMode = true;
         // 혁명 선택 모달 생성
         const gameContent = document.getElementById('gameContent');
         if (gameContent) {
           let html = '<div style="text-align:center;margin:2em 0;">';
+          if (data && data.role && data.nickname) {
+            html += `<div style=\"font-size:1.1em;color:#333;margin-bottom:1em;\">당신은 <b>${data.role}</b> (${data.nickname}) 입니다.</div>`;
+          }
           html += '<h2 style="color:#d32f2f;">🃏🃏 혁명 기회!</h2>';
           html += '<p style="color:#444;font-size:1.1em;margin-bottom:2em;">조커 2장을 보유하셨습니다.<br>혁명을 선언하면 카드 교환 없이 바로 게임이 시작됩니다.<br>혁명을 선언하시겠습니까?</p>';
           html += '<button id="revolutionYesBtn" style="padding:0.8em 2em;font-size:1.1em;background:#d32f2f;color:white;border:none;border-radius:8px;cursor:pointer;margin-right:1em;">혁명 선언</button>';
