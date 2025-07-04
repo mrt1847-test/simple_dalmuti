@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const path = require('path');
 
 const app = express();
+app.use(express.json()); // JSON body parser for API endpoints
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {

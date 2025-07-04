@@ -25,6 +25,7 @@
     <div class="room-list" id="roomList"></div>
     <form class="create-room" id="createRoomForm">
       <input type="text" id="roomName" placeholder="방 이름 입력" maxlength="20" required>
+      <input type="text" id="roomNickname" placeholder="닉네임 입력" maxlength="12" style="display:none;" required>
       <button type="submit">방 만들기</button>
     </form>
   </div>
@@ -37,8 +38,9 @@
     const nicknameFromQuery = getQueryParam('nickname');
     const nicknameInput = document.getElementById('roomNickname');
     if (nicknameFromQuery) {
-      // 쿼리로 닉네임이 오면 입력란 숨김
-      if (nicknameInput) nicknameInput.style.display = 'none';
+      nicknameInput.style.display = 'none';
+    } else {
+      nicknameInput.style.display = '';
     }
     async function fetchRooms() {
       const res = await fetch('/api/rooms');
@@ -59,6 +61,9 @@
     async function joinRoom(roomId) {
       let nickname = nicknameFromQuery;
       if (!nickname) {
+        nickname = nicknameInput.value.trim();
+      }
+      if (!nickname) {
         nickname = prompt('닉네임을 입력하세요 (중복 불가)');
       }
       if (!nickname) return;
@@ -68,6 +73,9 @@
       e.preventDefault();
       const roomName = document.getElementById('roomName').value.trim();
       let nickname = nicknameFromQuery;
+      if (!nickname) {
+        nickname = nicknameInput.value.trim();
+      }
       if (!nickname) {
         nickname = prompt('닉네임을 입력하세요 (중복 불가)');
       }
