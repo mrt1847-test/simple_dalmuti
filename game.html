@@ -552,11 +552,6 @@
         if (data.finished[data.playerIdx]) {
           appendChat(`🏁 ${player.nickname}님이 완주했습니다!`, false, true);
         }
-
-        // 시스템 채팅 메시지 중복 방지: 내가 낸 경우는 추가하지 않음
-        if (player.id !== socket.id) {
-          appendChat(`🎴 ${player.nickname}님이 ${cards}를 냈습니다.`, false, true);
-        }
         renderGame();
         syncTurnTimer();
       });
@@ -910,11 +905,6 @@
         // 완주한 플레이어 체크
         if (data.finished[data.playerIdx]) {
           appendChat(`🏁 ${player.nickname}님이 완주했습니다!`, false, true);
-        }
-
-        // 시스템 채팅 메시지 중복 방지: 내가 낸 경우는 추가하지 않음
-        if (player.id !== socket.id) {
-          appendChat(`🎴 ${player.nickname}님이 ${cards}를 냈습니다.`, false, true);
         }
         renderGame();
         syncTurnTimer();
