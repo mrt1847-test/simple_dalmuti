@@ -600,7 +600,31 @@ io.on('connection', (socket) => {
     const player = room.players.find(p => p.id === socket.id);
     if (player) player.ready = true;
     io.to(socket.roomId).emit('players', room.players);
-    if (room.game && !room.game.cardExchangeInProgress) {
+
+    // 게임 객체가 없으면 전체 필드로 초기화
+    if (!room.game) {
+      room.game = {
+        inProgress: false,
+        ordered: [],
+        turnIdx: 0,
+        lastPlay: null,
+        passes: 0,
+        playerHands: [],
+        finished: [],
+        finishOrder: [],
+        gameCount: 1,
+        lastGameScores: {},
+        totalScores: {},
+        cardExchangeInProgress: false,
+        slaveCardsGiven: [],
+        minerCardsGiven: [],
+        dalmutiCardSelected: false,
+        archbishopCardSelected: false,
+        isFirstTurnOfRound: false
+      };
+    }
+    // 카드 교환 중이 아니면 게임 시작 체크
+    if (!room.game.cardExchangeInProgress) {
       startGameIfReady();
     }
   });
