@@ -584,7 +584,7 @@ io.on('connection', (socket) => {
     if (room.players.length < MIN_PLAYERS - 1) {
       room.players.push({ id: socket.id, nickname, ready: false });
     } else {
-      if (!room.game.inProgress && !room.game.cardExchangeInProgress) {
+      if (!room.game || (!room.game.inProgress && !room.game.cardExchangeInProgress)) {
         room.players.push({ id: socket.id, nickname, ready: false });
       } else {
         return callback && callback({ success: false, message: '게임이 진행 중입니다' });
