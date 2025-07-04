@@ -705,7 +705,7 @@ io.on('connection', (socket) => {
         hand.splice(cardIndexToRemove, 1);
       }
     });
-    game.lastPlay = {count: cards.length, number: num, playerIdx: idx};
+    game.lastPlay = {count: cards.length, number: num, playerIdx: idx, cards: [...cards]};
     game.passes = 0;
     game.isFirstTurnOfRound = false; // 카드를 내면 첫 턴 플래그 해제
 
@@ -730,7 +730,7 @@ io.on('connection', (socket) => {
       io.emit('playResult', {
         playerIdx: idx, 
         cards, 
-        lastPlay: {count: cards.length, number: num, playerIdx: idx},
+        lastPlay: {count: cards.length, number: num, playerIdx: idx, cards: [...cards]},
         finished: game.finished,
         playerHands: game.playerHands.map(hand => hand.length)
       });
