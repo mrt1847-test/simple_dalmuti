@@ -559,27 +559,24 @@ io.on('connection', (socket) => {
     }
 
     // --- 로비 입장 로직 ---
-    // 중복 닉네임 처리 (이미 로비에 있는 경우 소켓 ID만 업데이트)
+    // 게임이 진행 중이 아닐 때만 중복 닉네임 체크
     const existingPlayer = players.find(p => p.nickname === nickname);
     if (existingPlayer) {
-      existingPlayer.id = socket.id;
+      return callback({ success: false, message: '중복 닉네임' });
+    }
+    // 이하 기존 입장 로직 유지
+    if (players.length >= MAX_PLAYERS) {
+      return callback({ success: false, message: '최대 인원 초과' });
+    }
+    if (players.length < MIN_PLAYERS - 1) {
+      players.push({ id: socket.id, nickname, ready: false });
     } else {
-      if (players.length >= MAX_PLAYERS) {
-        return callback({ success: false, message: '최대 인원 초과' });
-      }
-      if (players.length < MIN_PLAYERS - 1) {
-        // 최소 인원보다 적을 때는 자동으로 입장 허용
+      if (!game.inProgress && !game.cardExchangeInProgress) {
         players.push({ id: socket.id, nickname, ready: false });
       } else {
-        // 최소 인원에 도달했을 때는 게임 진행 중이 아닐 때만 입장 허용
-        if (!game.inProgress && !game.cardExchangeInProgress) {
-          players.push({ id: socket.id, nickname, ready: false });
-        } else {
-          return callback({ success: false, message: '게임이 진행 중입니다' });
-        }
+        return callback({ success: false, message: '게임이 진행 중입니다' });
       }
     }
-    
     io.emit('players', players);
     callback({ success: true });
   });
