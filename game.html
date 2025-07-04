@@ -362,8 +362,14 @@
           html += `<div style="text-align:center;margin:3.5em 0 1em 0;font-size:1.2em;">`;
           if (turnInfo.currentPlayer.id === socket.id) {
             html += '<div style="color:#4caf50;font-weight:bold;">🎯 당신의 차례입니다!</div>';
+            if (turnInfo.isFirstTurnOfRound) {
+              html += '<div style="color:#f57c00;font-weight:bold;margin-top:0.5em;">⚠️ 새로운 라운드의 첫 턴입니다! 패스할 수 없습니다.</div>';
+            }
           } else {
             html += `현재 차례: <b>${turnInfo.currentPlayer.nickname}</b> (${turnInfo.currentPlayer.role})`;
+            if (turnInfo.isFirstTurnOfRound) {
+              html += '<div style="color:#f57c00;font-weight:bold;margin-top:0.5em;">⚠️ 새로운 라운드의 첫 턴입니다!</div>';
+            }
           }
           html += '</div>';
           html += '<div id="turnTimer" style="text-align:center;font-size:1.1em;margin-bottom:1em;"></div>';
@@ -388,8 +394,13 @@
           
           // 마지막 플레이어가 남았는지 확인
           const activePlayers = ordered.filter(p => !p.finished).length;
-          if (activePlayers > 1) {
+          const isFirstTurn = turnInfo && turnInfo.isFirstTurnOfRound;
+          const isMyTurn = turnInfo && turnInfo.currentPlayer && turnInfo.currentPlayer.id === socket.id;
+          
+          if (activePlayers > 1 && !(isFirstTurn && isMyTurn)) {
             html += '<button id="passBtn" style="padding:0.7em 2em;font-size:1.1em;">패스</button>';
+          } else if (isFirstTurn && isMyTurn) {
+            html += '<button id="passBtn" style="padding:0.7em 2em;font-size:1.1em;background:#ffcdd2;color:#c62828;cursor:not-allowed;" disabled>첫 턴 패스 불가</button>';
           } else {
             html += '<button id="passBtn" style="padding:0.7em 2em;font-size:1.1em;background:#ccc;color:#666;cursor:not-allowed;" disabled>패스 불가</button>';
           }
@@ -451,7 +462,11 @@
               alert('아직 내 차례가 아닙니다!');
               return;
             }
-            socket.emit('passTurn');
+            socket.emit('passTurn', (res) => {
+              if (res && !res.success) {
+                alert(res.message);
+              }
+            });
           };
         }
 
@@ -482,6 +497,10 @@
         turnInfo = data;
         field = null;
         appendChat('🔄 새로운 라운드가 시작됩니다!', false, true);
+        // 첫 턴 플레이어에게 특별 메시지
+        if (data.currentPlayer && data.currentPlayer.id === socket.id) {
+          appendChat('🎯 새로운 라운드의 첫 턴입니다! 패스할 수 없으니 카드를 내주세요.', false, true);
+        }
         renderGame();
         syncTurnTimer();
       });

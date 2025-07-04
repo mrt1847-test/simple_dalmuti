@@ -33,7 +33,8 @@ let game = {
   slaveCardsGiven: [],
   minerCardsGiven: [],
   dalmutiCardSelected: false,
-  archbishopCardSelected: false
+  archbishopCardSelected: false,
+  isFirstTurnOfRound: false // 새로운 라운드의 첫 턴인지 추적
 };
 // ------------------------------------
 
@@ -73,7 +74,8 @@ function resetGame() {
     slaveCardsGiven: [],
     minerCardsGiven: [],
     dalmutiCardSelected: false,
-    archbishopCardSelected: false
+    archbishopCardSelected: false,
+    isFirstTurnOfRound: false
   };
   players.forEach(p => p.ready = false);
   io.emit('players', players);
@@ -149,6 +151,7 @@ function startGameIfReady() {
     game.passes = 0;
     game.finished = Array(game.ordered.length).fill(false);
     game.finishOrder = [];
+    game.isFirstTurnOfRound = true; // 게임 시작 시 첫 턴 플래그 설정
     // gameCount, lastGameScores, totalScores는 게임이 완전히 끝날 때 초기화하거나 다음 라운드 시작 시 해야 함
 
     // 4. 카드 분배 및 저장
@@ -402,7 +405,7 @@ function startGameAfterCardExchange() {
     io.to(p.id).emit('gameSetup', {
       ordered: game.ordered.map((p, i) => ({ ...p, cardCount: game.playerHands[i].length, finished: game.finished[i] })),
       myCards: game.playerHands[i],
-      turnInfo: { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx] },
+      turnInfo: { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx], isFirstTurnOfRound: game.isFirstTurnOfRound },
       field: game.lastPlay
     });
   });
@@ -435,6 +438,10 @@ function clearTurnTimer() {
 function autoPassTurn(socketId) {
   const idx = game.ordered.findIndex(p => p.id === socketId);
   if (!game.inProgress || idx !== game.turnIdx || game.finished[idx]) return;
+  
+  // 타임오버로 인한 자동 패스는 첫 턴이라도 허용
+  console.log(`\n--- [autoPassTurn] ${game.ordered[idx].nickname}이 타임오버로 자동 패스됨 (첫 턴 여부: ${game.isFirstTurnOfRound}) ---`);
+  
   game.passes++;
   io.emit('passResult', {playerIdx: idx, passes: game.passes});
   // 현재 게임에 참여 중인(완주하지 않은) 플레이어 수 계산
@@ -450,7 +457,8 @@ function autoPassTurn(socketId) {
       }
     }
     game.lastPlay = null;
-    io.emit('newRound', {turnIdx: game.turnIdx, lastPlay: null, currentPlayer: game.ordered[game.turnIdx]});
+    game.isFirstTurnOfRound = true; // 새로운 라운드 시작 시 첫 턴 플래그 설정
+    io.emit('newRound', {turnIdx: game.turnIdx, lastPlay: null, currentPlayer: game.ordered[game.turnIdx], isFirstTurnOfRound: true});
     startTurnTimer();
   } else if (activePlayersCount === 1) {
     // 플레이어가 1명만 남은 경우, 패스할 수 없고 카드를 내야 함
@@ -459,7 +467,7 @@ function autoPassTurn(socketId) {
     do {
       game.turnIdx = (game.turnIdx + 1) % game.ordered.length;
     } while (game.finished[game.turnIdx]);
-    io.emit('turnChanged', { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx] });
+    io.emit('turnChanged', { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx], isFirstTurnOfRound: false });
     startTurnTimer();
   }
 }
@@ -529,7 +537,7 @@ io.on('connection', (socket) => {
           io.to(socket.id).emit('gameSetup', {
             ordered: game.ordered.map((p, i) => ({ ...p, cardCount: game.playerHands[i].length, finished: game.finished[i] })),
             myCards: game.playerHands[playerIndex],
-            turnInfo: { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx] },
+            turnInfo: { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx], isFirstTurnOfRound: game.isFirstTurnOfRound },
             field: game.lastPlay
           });
         }
@@ -682,6 +690,7 @@ io.on('connection', (socket) => {
     });
     game.lastPlay = {count: cards.length, number: num, playerIdx: idx};
     game.passes = 0;
+    game.isFirstTurnOfRound = false; // 카드를 내면 첫 턴 플래그 해제
 
     // 1 또는 1+조커를 낸 경우: 즉시 모든 미완주 플레이어 패스 처리 및 라운드 리셋
     if (num === 1) {
@@ -694,8 +703,9 @@ io.on('connection', (socket) => {
       game.passes = 0;
       game.turnIdx = idx;
       game.lastPlay = null;
+      game.isFirstTurnOfRound = true; // 1을 내서 새로운 라운드 시작 시 첫 턴 플래그 설정
       setTimeout(() => {
-        io.emit('newRound', {turnIdx: game.turnIdx, lastPlay: null, currentPlayer: game.ordered[game.turnIdx]});
+        io.emit('newRound', {turnIdx: game.turnIdx, lastPlay: null, currentPlayer: game.ordered[game.turnIdx], isFirstTurnOfRound: true});
         startTurnTimer();
       }, 400); // 약간의 딜레이로 클라가 playResult를 먼저 받게 함
       // playResult 이후의 턴 진행 로직은 여기서 종료
@@ -801,13 +811,20 @@ io.on('connection', (socket) => {
       game.turnIdx = (game.turnIdx + 1) % game.ordered.length;
     } while (game.finished[game.turnIdx]);
     
-    io.emit('turnChanged', { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx] });
+    io.emit('turnChanged', { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx], isFirstTurnOfRound: false });
     startTurnTimer();
   });
   
   socket.on('passTurn', (cb) => {
     const idx = game.ordered.findIndex(p => p.id === socket.id);
     if (!game.inProgress || idx !== game.turnIdx || game.finished[idx]) return;
+    
+    // 새로운 라운드의 첫 턴에는 패스할 수 없음
+    if (game.isFirstTurnOfRound) {
+      console.log(`\n--- [passTurn] ${game.ordered[idx].nickname}이 첫 턴에 패스 시도 - 거부됨 ---`);
+      return cb && cb({success: false, message: '새로운 라운드의 첫 턴에는 패스할 수 없습니다. 카드를 내주세요.'});
+    }
+    
     clearTurnTimer();
     game.passes++;
     io.emit('passResult', {playerIdx: idx, passes: game.passes});
@@ -836,7 +853,8 @@ io.on('connection', (socket) => {
       }
       // lastPlay가 null이면 (라운드 첫 턴에 모두 패스하는 비정상적 상황) 현재 턴 유지
       game.lastPlay = null;
-      io.emit('newRound', {turnIdx: game.turnIdx, lastPlay: null, currentPlayer: game.ordered[game.turnIdx]});
+      game.isFirstTurnOfRound = true; // 새로운 라운드 시작 시 첫 턴 플래그 설정
+      io.emit('newRound', {turnIdx: game.turnIdx, lastPlay: null, currentPlayer: game.ordered[game.turnIdx], isFirstTurnOfRound: true});
       startTurnTimer();
     } else if (activePlayersCount === 1) {
       // 플레이어가 1명만 남은 경우, 패스할 수 없고 카드를 내야 함
@@ -846,9 +864,11 @@ io.on('connection', (socket) => {
       do {
         game.turnIdx = (game.turnIdx + 1) % game.ordered.length;
       } while (game.finished[game.turnIdx]);
-      io.emit('turnChanged', { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx] });
+      io.emit('turnChanged', { turnIdx: game.turnIdx, currentPlayer: game.ordered[game.turnIdx], isFirstTurnOfRound: false });
       startTurnTimer();
     }
+    
+    cb && cb({success: true});
   });
 
   // 달무티가 농노에게 줄 카드 선택
