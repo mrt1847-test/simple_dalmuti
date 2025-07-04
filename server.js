@@ -81,7 +81,7 @@ function resetGame() {
   io.emit('players', players);
   
   // 게임이 중단되었음을 클라이언트에게 알림
-  io.emit('gameInterrupted', { message: '게임 진행 중에 플레이어가 부족하여 게임이 중단되었습니다.' });
+  io.emit('gameInterrupted', { message: '게임 진행 중에 플레이어가 나가서 게임이 중단되었습니다.' });
 }
 
 function startGameIfReady() {
@@ -633,9 +633,9 @@ io.on('connection', (socket) => {
     socket.emit('resetClient');
     players = players.filter(p => p.id !== socket.id);
     io.emit('players', players);
-    // 게임 진행 중에 플레이어가 3명 이하가 되면 게임 상태 초기화
-    if (game.inProgress && players.length < 4) {
-      console.log(`게임 진행 중에 플레이어가 ${players.length}명이 되어 게임을 중단합니다.`);
+    // 게임 진행 중에 플레이어가 의도적으로 나가면 게임 상태 초기화
+    if (game.inProgress) {
+      console.log(`게임 진행 중에 플레이어가 의도적으로 나가서 게임을 중단합니다. (남은 플레이어: ${players.length}명)`);
       resetGame();
     }
   });
