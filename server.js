@@ -19,14 +19,15 @@ const MAX_PLAYERS = 8;
 // --- 방 관리 구조 추가 ---
 const rooms = {};
 
-function createRoom(roomId, roomName) {
+function createRoom(roomId, roomName, maxPlayers) {
   rooms[roomId] = {
     id: roomId,
     name: roomName,
     players: [],
     game: null, // 기존 game 구조를 여기에 넣음
     createdAt: Date.now(),
-    timerEnabled: true // 타이머 ON이 기본값
+    timerEnabled: true, // 타이머 ON이 기본값
+    maxPlayers: maxPlayers || MAX_PLAYERS
   };
 }
 
@@ -39,17 +40,19 @@ app.use(express.static(__dirname));
 
 // 방 생성 API (console.log 추가)
 app.post('/api/create-room', (req, res) => {
-  const { roomName } = req.body;
+  const { roomName, maxPlayers } = req.body;
   if (!roomName || typeof roomName !== 'string' || !roomName.trim()) {
     return res.json({ success: false, message: '방 이름을 입력하세요.' });
   }
+  let maxP = parseInt(maxPlayers, 10);
+  if (isNaN(maxP) || maxP < MIN_PLAYERS || maxP > MAX_PLAYERS) maxP = MAX_PLAYERS;
   // 고유 roomId 생성 (예: timestamp+랜덤)
   const roomId = 'room_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
   if (rooms[roomId]) {
     return res.json({ success: false, message: '방 ID 중복. 다시 시도하세요.' });
   }
-  createRoom(roomId, roomName.trim());
-  console.log('방 생성:', roomId, roomName); // 생성 로그
+  createRoom(roomId, roomName.trim(), maxP);
+  console.log('방 생성:', roomId, roomName, '최대인원:', maxP); // 생성 로그
   res.json({ success: true, roomId });
 });
 
@@ -58,7 +61,8 @@ app.get('/api/rooms', (req, res) => {
   res.json(Object.values(rooms).map(r => ({
     id: r.id,
     name: r.name,
-    playerCount: r.players.length
+    playerCount: r.players.length,
+    maxPlayers: r.maxPlayers || MAX_PLAYERS
   })));
 });
 
@@ -577,7 +581,7 @@ io.on('connection', (socket) => {
     if (existingPlayer) {
       return callback && callback({ success: false, message: '중복 닉네임' });
     }
-    if (room.players.length >= MAX_PLAYERS) {
+    if (room.players.length >= (room.maxPlayers || MAX_PLAYERS)) {
       return callback && callback({ success: false, message: '최대 인원 초과' });
     }
     if (room.players.length < MIN_PLAYERS - 1) {
@@ -589,7 +593,7 @@ io.on('connection', (socket) => {
         return callback && callback({ success: false, message: '게임이 진행 중입니다' });
       }
     }
-    io.to(socket.roomId).emit('players', room.players);
+    io.to(socket.roomId).emit('players', { players: room.players, maxPlayers: room.maxPlayers || MAX_PLAYERS });
     callback && callback({ success: true });
   });
 
@@ -598,7 +602,7 @@ io.on('connection', (socket) => {
     if (!room) return;
     const player = room.players.find(p => p.id === socket.id);
     if (player) player.ready = true;
-    io.to(socket.roomId).emit('players', room.players);
+    io.to(socket.roomId).emit('players', { players: room.players, maxPlayers: room.maxPlayers || MAX_PLAYERS });
 
     // 게임 객체가 없으면 전체 필드로 초기화
     if (!room.game) {
@@ -633,7 +637,7 @@ io.on('connection', (socket) => {
     if (!room) return;
     const player = room.players.find(p => p.id === socket.id);
     if (player) player.ready = false;
-    io.to(socket.roomId).emit('players', room.players);
+    io.to(socket.roomId).emit('players', { players: room.players, maxPlayers: room.maxPlayers || MAX_PLAYERS });
   });
 
   socket.on('chat', (msg) => {
@@ -665,7 +669,7 @@ io.on('connection', (socket) => {
         // 게임 중 재접속 대기
       } else {
         room.players = room.players.filter(p => p.id !== socket.id);
-        io.to(socket.roomId).emit('players', room.players);
+        io.to(socket.roomId).emit('players', { players: room.players, maxPlayers: room.maxPlayers || MAX_PLAYERS });
         socket.leave(socket.roomId); // 방에서 소켓 제거
       }
     }
@@ -678,7 +682,7 @@ io.on('connection', (socket) => {
     if (!room) return;
     socket.emit('resetClient');
     room.players = room.players.filter(p => p.id !== socket.id);
-    io.to(socket.roomId).emit('players', room.players);
+    io.to(socket.roomId).emit('players', { players: room.players, maxPlayers: room.maxPlayers || MAX_PLAYERS });
     socket.leave(socket.roomId); // 방에서 소켓 제거
     if (room.game && room.game.inProgress) {
       resetGame();

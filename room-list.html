@@ -25,7 +25,16 @@
     <div class="room-list" id="roomList"></div>
     <form class="create-room" id="createRoomForm">
       <input type="text" id="roomName" placeholder="방 이름 입력" maxlength="20" required>
-      <input type="text" id="roomNickname" placeholder="닉네임 입력" maxlength="12" style="display:none;" required>
+      <div style="display:flex;align-items:center;border:1px solid #ccc;border-radius:4px;background:#f8f8f8;box-sizing:border-box;overflow:hidden;">
+        <div style="display:flex;align-items:center;justify-content:center;padding:8px 10px 8px 8px;font-size:12px;color:#888;min-width:56px;background:none;border:none;">최대인원</div>
+        <select id="maxPlayers" style="width:40px;font-size:11px;padding:8px 8px 8px 0;border:none;outline:none;background:none;box-sizing:border-box;">
+          <option value="4">4</option>
+          <option value="5">5</option>
+          <option value="6">6</option>
+          <option value="7">7</option>
+          <option value="8" selected>8</option>
+        </select>
+      </div>
       <button type="submit">방 만들기</button>
     </form>
   </div>
@@ -36,13 +45,9 @@
       return url.searchParams.get(name);
     }
     const nicknameFromQuery = getQueryParam('nickname');
-    const nicknameInput = document.getElementById('roomNickname');
-    if (nicknameFromQuery) {
-      nicknameInput.style.display = 'none';
-      nicknameInput.required = false;
-    } else {
-      nicknameInput.style.display = '';
-      nicknameInput.required = true;
+    if (!nicknameFromQuery) {
+      alert('닉네임이 필요합니다.');
+      window.location.href = 'index.html';
     }
     async function fetchRooms() {
       const res = await fetch('/api/rooms');
@@ -54,7 +59,7 @@
         div.className = 'room';
         div.innerHTML = `
           <span class="room-name">${room.name}</span>
-          <span class="room-players">(${room.playerCount}명)</span>
+          <span class="room-players">(${room.playerCount}/${room.maxPlayers}명)</span>
           <button class="join-btn" onclick="joinRoom('${room.id}')">입장</button>
         `;
         list.appendChild(div);
@@ -62,9 +67,6 @@
     }
     async function joinRoom(roomId) {
       let nickname = nicknameFromQuery;
-      if (!nickname) {
-        nickname = nicknameInput.value.trim();
-      }
       if (!nickname) {
         nickname = prompt('닉네임을 입력하세요 (중복 불가)');
       }
@@ -74,18 +76,16 @@
     document.getElementById('createRoomForm').onsubmit = async e => {
       e.preventDefault();
       const roomName = document.getElementById('roomName').value.trim();
+      const maxPlayers = parseInt(document.getElementById('maxPlayers').value, 10);
       let nickname = nicknameFromQuery;
-      if (!nickname) {
-        nickname = nicknameInput.value.trim();
-      }
       if (!nickname) {
         nickname = prompt('닉네임을 입력하세요 (중복 불가)');
       }
-      if (!roomName || !nickname) return;
+      if (!roomName || !nickname || isNaN(maxPlayers) || maxPlayers < 4 || maxPlayers > 8) return;
       const res = await fetch('/api/create-room', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomName })
+        body: JSON.stringify({ roomName, maxPlayers })
       });
       const data = await res.json();
       if (data.success) {
