@@ -77,7 +77,10 @@ function resetGame() {
     archbishopCardSelected: false,
     isFirstTurnOfRound: false
   };
-  players.forEach(p => p.ready = false);
+  
+  // players 배열도 정리 (게임 중단 시 모든 플레이어 제거)
+  players = [];
+  
   io.emit('players', players);
   
   // 게임이 중단되었음을 클라이언트에게 알림
@@ -477,6 +480,12 @@ function autoPassTurn(socketId) {
 
 io.on('connection', (socket) => {
   socket.on('join', (nickname, callback) => {
+    // 닉네임 유효성 검사
+    if (!nickname || typeof nickname !== 'string' || nickname.trim() === '') {
+      return callback({ success: false, message: '유효하지 않은 닉네임입니다.' });
+    }
+    
+    nickname = nickname.trim();
     socket.nickname = nickname;
 
     // --- 게임 재접속 및 데이터 전송 로직 ---
@@ -615,17 +624,24 @@ io.on('connection', (socket) => {
       clearTurnTimer();
       return;
     }
-    io.emit('chat', {nickname: socket.nickname, msg});
+    
+    // 닉네임이 없는 경우 처리
+    const senderNickname = socket.nickname || 'Unknown';
+    io.emit('chat', {nickname: senderNickname, msg});
   });
 
   socket.on('disconnect', () => {
     const player = players.find(p => p.id === socket.id);
-    if (player && game.inProgress) {
-      console.log(`게임 중인 플레이어 ${player.nickname}의 연결이 끊겼습니다.`);
-      // 여기서 바로 제거하지 않고, 재접속을 기다리거나 타임아웃 처리
-    } else {
-      players = players.filter(p => p.id !== socket.id);
-      io.emit('players', players);
+    if (player) {
+      if (game.inProgress || game.cardExchangeInProgress) {
+        console.log(`게임 중인 플레이어 ${player.nickname}의 연결이 끊겼습니다. 재접속을 기다립니다.`);
+        // 게임 진행 중이면 플레이어를 제거하지 않고 재접속을 기다림
+        // 30초 후에도 재접속하지 않으면 제거하는 로직을 추가할 수 있음
+      } else {
+        console.log(`플레이어 ${player.nickname}의 연결이 끊겼습니다.`);
+        players = players.filter(p => p.id !== socket.id);
+        io.emit('players', players);
+      }
     }
   });
 
