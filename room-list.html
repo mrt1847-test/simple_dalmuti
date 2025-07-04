@@ -39,8 +39,10 @@
     const nicknameInput = document.getElementById('roomNickname');
     if (nicknameFromQuery) {
       nicknameInput.style.display = 'none';
+      nicknameInput.required = false;
     } else {
       nicknameInput.style.display = '';
+      nicknameInput.required = true;
     }
     async function fetchRooms() {
       const res = await fetch('/api/rooms');
