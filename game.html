@@ -532,20 +532,9 @@
         }
 
         // 내가 낸 카드면 손에서 제거
-        if (player.id === socket.id) {
-          if (selected && selected.length > 0) {
-            // 인덱스가 큰 것부터 제거해야 index shift 문제 없음
-            selected.sort((a, b) => b - a).forEach(idx => {
-              myCards.splice(idx, 1);
-            });
-            selected = [];
-          } else {
-            // fallback: 값 기반 제거 (예외 상황)
-            data.cards.forEach(card => {
-              const idx = myCards.findIndex(c => c === card);
-              if (idx > -1) myCards.splice(idx, 1);
-            });
-          }
+        if (player.id === socket.id && data.myCards) {
+          myCards = data.myCards.slice(); // 서버 상태로 동기화
+          selected = [];
         }
         
         // 완주한 플레이어 체크
@@ -886,20 +875,9 @@
         }
 
         // 내가 낸 카드면 손에서 제거
-        if (player.id === socket.id) {
-          if (selected && selected.length > 0) {
-            // 인덱스가 큰 것부터 제거해야 index shift 문제 없음
-            selected.sort((a, b) => b - a).forEach(idx => {
-              myCards.splice(idx, 1);
-            });
-            selected = [];
-          } else {
-            // fallback: 값 기반 제거 (예외 상황)
-            data.cards.forEach(card => {
-              const idx = myCards.findIndex(c => c === card);
-              if (idx > -1) myCards.splice(idx, 1);
-            });
-          }
+        if (player.id === socket.id && data.myCards) {
+          myCards = data.myCards.slice(); // 서버 상태로 동기화
+          selected = [];
         }
         
         // 완주한 플레이어 체크

@@ -223,16 +223,8 @@ function startGameIfReady() {
         }
       }
     }
-    if (dalmutiIdx !== -1) {
-      while(cardDealIndex < deck.length) {
-        if(deck[cardDealIndex]) {
-          hands[dalmutiIdx].push(deck[cardDealIndex++]);
-        } else {
-          cardDealIndex++; // 만약을 대비한 무한 루프 방지
-        }
-      }
-    }
-    
+    // 각 손패를 정렬
+    hands.forEach(hand => hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b)));
     game.playerHands = hands; // 더 이상 map, slice 필요 없음. 위에서부터 격리됨.
 
     // 5. 카드 교환 단계 (농노 ↔ 달무티, 광부 ↔ 대주교)
@@ -258,9 +250,9 @@ function startGameIfReady() {
           game.playerHands[dalmutiIdx].push(card);
         }
       });
-      
+      // 카드 교환 후 손패 정렬
+      game.playerHands.forEach(hand => hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b)));
       console.log(`농노(${game.ordered[slaveIdx].nickname})가 달무티에게 카드 전달: [${lowestCards.join(',')}]`);
-      
       // 카드 교환 완료 플래그 설정
       game.cardExchangeInProgress = true;
       game.slaveCardsGiven = lowestCards;
@@ -282,9 +274,9 @@ function startGameIfReady() {
         game.playerHands[minerIdx].splice(cardIndex, 1);
         game.playerHands[archbishopIdx].push(lowestCard);
       }
-      
+      // 카드 교환 후 손패 정렬
+      game.playerHands.forEach(hand => hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b)));
       console.log(`광부(${game.ordered[minerIdx].nickname})가 대주교에게 카드 전달: [${lowestCard}]`);
-      
       // 카드 교환 완료 플래그 설정
       game.cardExchangeInProgress = true;
       game.minerCardsGiven = [lowestCard];
@@ -705,6 +697,8 @@ io.on('connection', (socket) => {
         hand.splice(cardIndexToRemove, 1);
       }
     });
+    // 카드 제출 후 손패 정렬
+    hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b));
     game.lastPlay = {count: cards.length, number: num, playerIdx: idx, cards: [...cards]};
     game.passes = 0;
     game.isFirstTurnOfRound = false; // 카드를 내면 첫 턴 플래그 해제
@@ -727,12 +721,19 @@ io.on('connection', (socket) => {
       }, 400); // 약간의 딜레이로 클라가 playResult를 먼저 받게 함
       // playResult 이후의 턴 진행 로직은 여기서 종료
       clearTurnTimer();
-      io.emit('playResult', {
-        playerIdx: idx, 
-        cards, 
-        lastPlay: {count: cards.length, number: num, playerIdx: idx, cards: [...cards]},
-        finished: game.finished,
-        playerHands: game.playerHands.map(hand => hand.length)
+      // 각 플레이어에게 자신의 myCards를 포함해 playResult 전송
+      game.ordered.forEach((p, i) => {
+        const targetSocket = io.sockets.sockets.get(p.id);
+        if (targetSocket) {
+          targetSocket.emit('playResult', {
+            playerIdx: idx,
+            cards,
+            lastPlay: {count: cards.length, number: num, playerIdx: idx, cards: [...cards]},
+            finished: game.finished,
+            playerHands: game.playerHands.map(hand => hand.length),
+            myCards: game.playerHands[i]
+          });
+        }
       });
       cb && cb({success: true});
       return;
@@ -752,12 +753,18 @@ io.on('connection', (socket) => {
     console.log('`finished` array state:', JSON.stringify(game.finished));
     
     clearTurnTimer();
-    io.emit('playResult', {
-      playerIdx: idx, 
-      cards, 
-      lastPlay: game.lastPlay, 
-      finished: game.finished,
-      playerHands: game.playerHands.map(hand => hand.length)
+    game.ordered.forEach((p, i) => {
+      const targetSocket = io.sockets.sockets.get(p.id);
+      if (targetSocket) {
+        targetSocket.emit('playResult', {
+          playerIdx: idx,
+          cards,
+          lastPlay: game.lastPlay,
+          finished: game.finished,
+          playerHands: game.playerHands.map(hand => hand.length),
+          myCards: game.playerHands[i]
+        });
+      }
     });
     cb && cb({success: true});
 
@@ -936,6 +943,8 @@ io.on('connection', (socket) => {
       }
     });
     
+    // 카드 교환 후 손패 정렬
+    game.playerHands.forEach(hand => hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b)));
     console.log(`달무티(${game.ordered[idx].nickname})가 농노에게 카드 전달: [${selectedCards.join(',')}]`);
     console.log(`달무티 최종 손패: [${game.playerHands[idx].join(',')}]`);
     console.log(`농노 최종 손패: [${game.playerHands[slaveIdx].join(',')}]`);
@@ -1011,6 +1020,8 @@ io.on('connection', (socket) => {
       }
     });
     
+    // 카드 교환 후 손패 정렬
+    game.playerHands.forEach(hand => hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b)));
     console.log(`대주교(${game.ordered[idx].nickname})가 광부에게 카드 전달: [${selectedCards.join(',')}]`);
     console.log(`대주교 최종 손패: [${game.playerHands[idx].join(',')}]`);
     console.log(`광부 최종 손패: [${game.playerHands[minerIdx].join(',')}]`);
