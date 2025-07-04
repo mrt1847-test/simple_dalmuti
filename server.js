@@ -87,9 +87,9 @@ app.use((req, res, next) => {
   }
 });
 
-function resetGame() {
-  // 게임 상태를 하나의 객체로 관리
-  let game = {
+function resetGame(roomId) {
+  // 게임 상태를 완전히 초기화
+  rooms[roomId].game = {
     inProgress: false,
     ordered: [],
     turnIdx: 0,
@@ -108,14 +108,11 @@ function resetGame() {
     archbishopCardSelected: false,
     isFirstTurnOfRound: false // 새로운 라운드의 첫 턴인지 추적
   };
-  
   // players 배열도 정리 (게임 중단 시 모든 플레이어 제거)
-  rooms[socket.roomId].players = [];
-  
-  io.emit('players', rooms[socket.roomId].players);
-  
+  rooms[roomId].players = [];
+  io.to(roomId).emit('players', rooms[roomId].players);
   // 게임이 중단되었음을 클라이언트에게 알림
-  io.emit('gameInterrupted', { message: '게임 진행 중에 플레이어가 나가서 게임이 중단되었습니다.' });
+  io.to(roomId).emit('gameInterrupted', { message: '게임 진행 중에 플레이어가 나가서 게임이 중단되었습니다.' });
 }
 
 function startGameIfReady(roomId) {
@@ -248,6 +245,22 @@ function startGameIfReady(roomId) {
     hands.forEach(hand => hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b)));
     rooms[roomId].game.playerHands = hands; // 더 이상 map, slice 필요 없음. 위에서부터 격리됨.
 
+    // 5. 혁명 기회 체크
+    const joker2Idx = hands.findIndex(hand => hand.filter(c => c === 'J').length === 2);
+    if (joker2Idx !== -1) {
+      // 혁명 선택 기회 부여
+      const revPlayer = rooms[roomId].game.ordered[joker2Idx];
+      io.to(revPlayer.id).emit('revolutionChoice');
+      // 나머지 플레이어는 대기 메시지
+      rooms[roomId].game.ordered.forEach((p, i) => {
+        if (i !== joker2Idx) {
+          io.to(p.id).emit('waitingForCardExchange', { message: `${revPlayer.nickname}님이 혁명 선언 여부를 선택 중입니다...` });
+        }
+      });
+      // 혁명 선택 결과를 기다림 (아래에 revolutionResult 핸들러 추가 필요)
+      return;
+    }
+    // 혁명 기회가 없으면 기존 카드 교환 단계로 진행
     // 5. 카드 교환 단계 (농노 ↔ 달무티, 광부 ↔ 대주교)
     const slaveIdx = rooms[roomId].game.ordered.findIndex(p => p.role === '노예');
     const minerIdx = rooms[roomId].game.ordered.findIndex(p => p.role === '광부');
@@ -691,7 +704,7 @@ io.on('connection', (socket) => {
     io.to(socket.roomId).emit('players', { players: room.players, maxPlayers: room.maxPlayers || MAX_PLAYERS });
     socket.leave(socket.roomId); // 방에서 소켓 제거
     if (room.game && room.game.inProgress) {
-      resetGame();
+      resetGame(socket.roomId);
     }
     if (room.players.length === 0) deleteRoom(socket.roomId);
   });
@@ -1104,6 +1117,101 @@ io.on('connection', (socket) => {
       startGameAfterCardExchange(socket.roomId);
     } else {
       console.log('대주교 카드 선택 완료! 달무티 카드 선택 대기 중...');
+    }
+  });
+
+  // 혁명 선택 결과 핸들러
+  socket.on('revolutionResult', ({ revolution }) => {
+    const roomId = socket.roomId;
+    if (!roomId || !rooms[roomId] || !rooms[roomId].game) return;
+    if (revolution) {
+      // 혁명 발생: 카드 교환 없이 바로 게임 시작
+      io.to(roomId).emit('chat', { nickname: 'SYSTEM', msg: '혁명 발생! 카드 교환 없이 게임이 시작됩니다.' });
+      startGameAfterCardExchange(roomId); // 카드 교환 없이 바로 진행
+    } else {
+      // 기존 카드 교환 단계로 진행 (기존 코드 복사)
+      const dalmutiIdx = rooms[roomId].game.ordered.findIndex(p => p.role === '달무티');
+      const slaveIdx = rooms[roomId].game.ordered.findIndex(p => p.role === '노예');
+      const minerIdx = rooms[roomId].game.ordered.findIndex(p => p.role === '광부');
+      const archbishopIdx = rooms[roomId].game.ordered.findIndex(p => p.role === '대주교');
+      if (dalmutiIdx !== -1 && slaveIdx !== -1) {
+        // 농노의 손패에서 가장 낮은 숫자 2장 찾기 (자동)
+        const slaveHand = [...rooms[roomId].game.playerHands[slaveIdx]];
+        slaveHand.sort((a, b) => {
+          const aVal = a === 'J' ? 13 : a;
+          const bVal = b === 'J' ? 13 : b;
+          return aVal - bVal;
+        });
+        const lowestCards = slaveHand.slice(0, 2);
+        // 농노의 카드를 달무티에게 전달
+        lowestCards.forEach(card => {
+          const cardIndex = rooms[roomId].game.playerHands[slaveIdx].indexOf(card);
+          if (cardIndex > -1) {
+            rooms[roomId].game.playerHands[slaveIdx].splice(cardIndex, 1);
+            rooms[roomId].game.playerHands[dalmutiIdx].push(card);
+          }
+        });
+        // 카드 교환 후 손패 정렬
+        rooms[roomId].game.playerHands.forEach(hand => hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b)));
+        rooms[roomId].game.cardExchangeInProgress = true;
+        rooms[roomId].game.slaveCardsGiven = lowestCards;
+      }
+      if (minerIdx !== -1 && archbishopIdx !== -1) {
+        // 광부의 손패에서 가장 낮은 숫자 1장 찾기 (자동)
+        const minerHand = [...rooms[roomId].game.playerHands[minerIdx]];
+        minerHand.sort((a, b) => {
+          const aVal = a === 'J' ? 13 : a;
+          const bVal = b === 'J' ? 13 : b;
+          return aVal - bVal;
+        });
+        const lowestCard = minerHand[0];
+        // 광부의 카드를 대주교에게 전달
+        const cardIndex = rooms[roomId].game.playerHands[minerIdx].indexOf(lowestCard);
+        if (cardIndex > -1) {
+          rooms[roomId].game.playerHands[minerIdx].splice(cardIndex, 1);
+          rooms[roomId].game.playerHands[archbishopIdx].push(lowestCard);
+        }
+        // 카드 교환 후 손패 정렬
+        rooms[roomId].game.playerHands.forEach(hand => hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b)));
+        rooms[roomId].game.cardExchangeInProgress = true;
+        rooms[roomId].game.minerCardsGiven = [lowestCard];
+      }
+      if (rooms[roomId].game.cardExchangeInProgress) {
+        rooms[roomId].game.dalmutiCardSelected = false;
+        rooms[roomId].game.archbishopCardSelected = false;
+        io.to(roomId).emit('gameStart');
+        setTimeout(() => {
+          const dalmutiIdx = rooms[roomId].game.ordered.findIndex(p => p.role === '달무티');
+          const archbishopIdx = rooms[roomId].game.ordered.findIndex(p => p.role === '대주교');
+          if (dalmutiIdx !== -1 && slaveIdx !== -1) {
+            io.to(rooms[roomId].game.ordered[dalmutiIdx].id).emit('selectCardsForSlave', {
+              message: '농노에게 줄 카드 2장을 선택하세요.',
+              hand: rooms[roomId].game.playerHands[dalmutiIdx]
+            });
+          }
+          if (archbishopIdx !== -1 && minerIdx !== -1) {
+            io.to(rooms[roomId].game.ordered[archbishopIdx].id).emit('selectCardsForMiner', {
+              message: '광부에게 줄 카드 1장을 선택하세요.',
+              hand: rooms[roomId].game.playerHands[archbishopIdx]
+            });
+          }
+          rooms[roomId].game.ordered.forEach((p, i) => {
+            if (i !== dalmutiIdx && i !== archbishopIdx) {
+              let waitingMessage = '';
+              if (dalmutiIdx !== -1 && archbishopIdx !== -1) {
+                waitingMessage = `${rooms[roomId].game.ordered[dalmutiIdx].nickname}님과 ${rooms[roomId].game.ordered[archbishopIdx].nickname}님이 카드 교환을 진행하고 있습니다...`;
+              } else if (dalmutiIdx !== -1) {
+                waitingMessage = `${rooms[roomId].game.ordered[dalmutiIdx].nickname}님이 농노에게 줄 카드를 선택하고 있습니다...`;
+              } else if (archbishopIdx !== -1) {
+                waitingMessage = `${rooms[roomId].game.ordered[archbishopIdx].nickname}님이 광부에게 줄 카드를 선택하고 있습니다...`;
+              }
+              io.to(p.id).emit('waitingForCardExchange', { message: waitingMessage });
+            }
+          });
+        }, 3000);
+      } else {
+        startGameAfterCardExchange(roomId);
+      }
     }
   });
 });

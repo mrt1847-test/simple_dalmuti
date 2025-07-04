@@ -1050,6 +1050,33 @@
         turnEndTime = data.endTime;
         startTurnCountdown();
       });
+
+      // 혁명 선택 요청 이벤트
+      socket.on('revolutionChoice', () => {
+        console.log('=== revolutionChoice 이벤트 수신 ===');
+        isCardSelectionMode = true;
+        // 혁명 선택 모달 생성
+        const gameContent = document.getElementById('gameContent');
+        if (gameContent) {
+          let html = '<div style="text-align:center;margin:2em 0;">';
+          html += '<h2 style="color:#d32f2f;">🃏🃏 혁명 기회!</h2>';
+          html += '<p style="color:#444;font-size:1.1em;margin-bottom:2em;">조커 2장을 보유하셨습니다.<br>혁명을 선언하면 카드 교환 없이 바로 게임이 시작됩니다.<br>혁명을 선언하시겠습니까?</p>';
+          html += '<button id="revolutionYesBtn" style="padding:0.8em 2em;font-size:1.1em;background:#d32f2f;color:white;border:none;border-radius:8px;cursor:pointer;margin-right:1em;">혁명 선언</button>';
+          html += '<button id="revolutionNoBtn" style="padding:0.8em 2em;font-size:1.1em;background:#888;color:white;border:none;border-radius:8px;cursor:pointer;">혁명 안함</button>';
+          html += '</div>';
+          gameContent.innerHTML = html;
+          document.getElementById('revolutionYesBtn').onclick = function() {
+            socket.emit('revolutionResult', { revolution: true });
+            isCardSelectionMode = false;
+            gameContent.innerHTML = '<div style="text-align:center;margin:2em 0;"><h2 style="color:#d32f2f;">혁명 선언!</h2><p style="color:#444;">카드 교환 없이 게임이 곧 시작됩니다...</p></div>';
+          };
+          document.getElementById('revolutionNoBtn').onclick = function() {
+            socket.emit('revolutionResult', { revolution: false });
+            isCardSelectionMode = false;
+            gameContent.innerHTML = '<div style="text-align:center;margin:2em 0;"><h2 style="color:#888;">혁명 안함</h2><p style="color:#444;">카드 교환 단계로 진행합니다...</p></div>';
+          };
+        }
+      });
     });
   </script>
 </body>
