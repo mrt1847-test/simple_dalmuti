@@ -649,11 +649,13 @@ io.on('connection', (socket) => {
     if (msg === '!타이머on') {
       room.timerEnabled = true;
       io.to(socket.roomId).emit('chat', {nickname: 'SYSTEM', msg: '타이머가 켜졌습니다.'});
+      io.to(socket.roomId).emit('timerStatus', { enabled: true });
       return;
     }
     if (msg === '!타이머off') {
       room.timerEnabled = false;
       io.to(socket.roomId).emit('chat', {nickname: 'SYSTEM', msg: '타이머가 꺼졌습니다.'});
+      io.to(socket.roomId).emit('timerStatus', { enabled: false });
       return;
     }
 

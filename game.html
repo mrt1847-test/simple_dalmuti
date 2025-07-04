@@ -287,12 +287,10 @@
 
       function updateTurnTimerUI() {
         const timerDiv = document.getElementById('turnTimer');
-        if (timerDiv) {
-          if (timerEnabled && turnInfo && turnInfo.currentPlayer && turnInfo.currentPlayer.id === socket.id) {
-            timerDiv.textContent = `⏰ 남은 시간: ${turnTimeLeft}초`;
-          } else {
-            timerDiv.textContent = '';
-          }
+        if (timerDiv && timerEnabled && turnInfo && turnInfo.currentPlayer) {
+          timerDiv.textContent = `⏰ 남은 시간: ${turnTimeLeft}초`;
+        } else if (timerDiv) {
+          timerDiv.textContent = '';
         }
       }
 
