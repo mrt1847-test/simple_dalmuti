@@ -33,15 +33,10 @@ function deleteRoom(roomId) {
   delete rooms[roomId];
 }
 
-// 요청 로깅 미들웨어 추가
-app.use((req, res, next) => {
-  console.log(`요청: ${req.method} ${req.url}`);
-  next();
-});
 
 app.use(express.static(__dirname));
 
-// 방 생성 API
+// 방 생성 API (console.log 추가)
 app.post('/api/create-room', (req, res) => {
   const { roomName } = req.body;
   if (!roomName || typeof roomName !== 'string' || !roomName.trim()) {
@@ -53,6 +48,7 @@ app.post('/api/create-room', (req, res) => {
     return res.json({ success: false, message: '방 ID 중복. 다시 시도하세요.' });
   }
   createRoom(roomId, roomName.trim());
+  console.log('방 생성:', roomId, roomName); // 생성 로그
   res.json({ success: true, roomId });
 });
 
@@ -77,9 +73,13 @@ app.get('/lobby', (req, res) => {
 app.get('/game', (req, res) => {
   res.sendFile(path.join(__dirname, 'game.html'));
 });
-// 기타 없는 경로는 join.html로
-app.use((req, res) => {
-  res.redirect('/join.html');
+// catch-all: GET만 /join.html로, 그 외는 404
+app.use((req, res, next) => {
+  if (req.method === 'GET') {
+    res.redirect('/join.html');
+  } else {
+    res.status(404).send('Not found');
+  }
 });
 
 function resetGame() {
