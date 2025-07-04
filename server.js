@@ -41,6 +41,30 @@ app.use((req, res, next) => {
 
 app.use(express.static(__dirname));
 
+// 방 생성 API
+app.post('/api/create-room', (req, res) => {
+  const { roomName } = req.body;
+  if (!roomName || typeof roomName !== 'string' || !roomName.trim()) {
+    return res.json({ success: false, message: '방 이름을 입력하세요.' });
+  }
+  // 고유 roomId 생성 (예: timestamp+랜덤)
+  const roomId = 'room_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+  if (rooms[roomId]) {
+    return res.json({ success: false, message: '방 ID 중복. 다시 시도하세요.' });
+  }
+  createRoom(roomId, roomName.trim());
+  res.json({ success: true, roomId });
+});
+
+// 방 목록 API
+app.get('/api/rooms', (req, res) => {
+  res.json(Object.values(rooms).map(r => ({
+    id: r.id,
+    name: r.name,
+    playerCount: r.players.length
+  })));
+});
+
 // 메인 진입 시 index.html로 리다이렉트
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
