@@ -1077,6 +1077,19 @@
           };
         }
       });
+
+      // 게임 시작 알림 (모든 라운드)
+      socket.on('gameStart', () => {
+        // 만약 현재 페이지가 game.html이 아니면 이동
+        if (!window.location.pathname.endsWith('game.html')) {
+          // roomId, nickname 쿼리스트링 유지
+          const params = new URLSearchParams(window.location.search);
+          window.location.href = '/game.html?' + params.toString();
+        } else {
+          // 이미 game.html이면 새로고침 또는 render
+          renderGame();
+        }
+      });
     });
   </script>
 </body>

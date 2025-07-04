@@ -248,15 +248,22 @@ function startGameIfReady(roomId) {
     // 5. 혁명 기회 체크
     const joker2Idx = hands.findIndex(hand => hand.filter(c => c === 'J').length === 2);
     if (joker2Idx !== -1) {
-      // 혁명 선택 기회 부여
-      const revPlayer = rooms[roomId].game.ordered[joker2Idx];
-      io.to(revPlayer.id).emit('revolutionChoice');
-      // 나머지 플레이어는 대기 메시지
-      rooms[roomId].game.ordered.forEach((p, i) => {
-        if (i !== joker2Idx) {
-          io.to(p.id).emit('waitingForCardExchange', { message: `${revPlayer.nickname}님이 혁명 선언 여부를 선택 중입니다...` });
-        }
-      });
+      // 먼저 클라이언트들에게 게임 페이지로 이동하라고 알림
+      io.to(roomId).emit('gameStart');
+      console.log('혁명 기회! gameStart 이벤트 전송. 클라이언트들이 game.html로 이동합니다.');
+      
+      // 3초 후에 혁명 선택 요청 (클라이언트들이 game.html로 이동할 시간을 줌)
+      setTimeout(() => {
+        // 혁명 선택 기회 부여
+        const revPlayer = rooms[roomId].game.ordered[joker2Idx];
+        io.to(revPlayer.id).emit('revolutionChoice');
+        // 나머지 플레이어들은 대기 메시지
+        rooms[roomId].game.ordered.forEach((p, i) => {
+          if (i !== joker2Idx) {
+            io.to(p.id).emit('waitingForCardExchange', { message: `${revPlayer.nickname}님이 혁명 선언 여부를 선택 중입니다...` });
+          }
+        });
+      }, 3000);
       // 혁명 선택 결과를 기다림 (아래에 revolutionResult 핸들러 추가 필요)
       return;
     }
