@@ -416,7 +416,7 @@ function startGameAfterCardExchange(roomId) {
   // 바로 게임 세팅 데이터 전송
   rooms[roomId].game.ordered.forEach((p, i) => {
     console.log(`${p.nickname}에게 gameSetup 전송 - 카드 ${rooms[roomId].game.playerHands[i].length}장`);
-    io.to(roomId).emit('gameSetup', {
+    io.to(p.id).emit('gameSetup', {
       ordered: rooms[roomId].game.ordered.map((p, i) => ({ ...p, cardCount: rooms[roomId].game.playerHands[i].length, finished: rooms[roomId].game.finished[i] })),
       myCards: rooms[roomId].game.playerHands[i],
       turnInfo: { turnIdx: rooms[roomId].game.turnIdx, currentPlayer: rooms[roomId].game.ordered[rooms[roomId].game.turnIdx], isFirstTurnOfRound: rooms[roomId].game.isFirstTurnOfRound },
@@ -426,27 +426,25 @@ function startGameAfterCardExchange(roomId) {
   console.log('gameSetup 데이터 전송 완료.');
 }
 
-let turnTimer = null;
-let timerEnabled = true; // 타이머 ON/OFF 상태 변수 추가
-
-function startTurnTimer() {
-  if (!timerEnabled) return; // 타이머 꺼져있으면 동작 안 함
-  if (turnTimer) clearTimeout(turnTimer);
-  turnTimer = setTimeout(() => {
-    // 현재 턴의 플레이어가 아직 행동하지 않았다면 자동 패스
-    const currentPlayer = rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx];
-    if (!rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]) {
-      io.to(socket.roomId).emit('turnTimeout'); // 클라이언트에 알림
+function startTurnTimer(roomId) {
+  const room = rooms[roomId];
+  if (!room || !room.game) return;
+  if (!room.timerEnabled) return; // 타이머 꺼져있으면 동작 안 함
+  if (room.turnTimer) clearTimeout(room.turnTimer);
+  room.turnTimer = setTimeout(() => {
+    const currentPlayer = room.game.ordered[room.game.turnIdx];
+    if (!room.game.finished[room.game.turnIdx]) {
+      io.to(roomId).emit('turnTimeout'); // 클라이언트에 알림
       // 서버에서 자동 패스 처리
-      // passTurn 로직을 직접 호출
-      autoPassTurn(socket.roomId, currentPlayer.id);
+      autoPassTurn(roomId, currentPlayer.id);
     }
   }, 30000); // 30초
 }
 
-function clearTurnTimer() {
-  if (turnTimer) clearTimeout(turnTimer);
-  turnTimer = null;
+function clearTurnTimer(roomId) {
+  const room = rooms[roomId];
+  if (room && room.turnTimer) clearTimeout(room.turnTimer);
+  if (room) room.turnTimer = null;
 }
 
 function autoPassTurn(roomId, socketId) {
@@ -473,7 +471,7 @@ function autoPassTurn(roomId, socketId) {
     rooms[roomId].game.lastPlay = null;
     rooms[roomId].game.isFirstTurnOfRound = true; // 새로운 라운드 시작 시 첫 턴 플래그 설정
     io.to(roomId).emit('newRound', {turnIdx: rooms[roomId].game.turnIdx, lastPlay: null, currentPlayer: rooms[roomId].game.ordered[rooms[roomId].game.turnIdx], isFirstTurnOfRound: true});
-    startTurnTimer();
+    startTurnTimer(roomId);
   } else if (activePlayersCount === 1) {
     // 플레이어가 1명만 남은 경우, 패스할 수 없고 카드를 내야 함
     // 패스 처리는 하지 않고 턴을 그대로 유지
@@ -482,7 +480,7 @@ function autoPassTurn(roomId, socketId) {
       rooms[roomId].game.turnIdx = (rooms[roomId].game.turnIdx + 1) % rooms[roomId].game.ordered.length;
     } while (rooms[roomId].game.finished[rooms[roomId].game.turnIdx]);
     io.to(roomId).emit('turnChanged', { turnIdx: rooms[roomId].game.turnIdx, currentPlayer: rooms[roomId].game.ordered[rooms[roomId].game.turnIdx], isFirstTurnOfRound: false });
-    startTurnTimer();
+    startTurnTimer(roomId);
   }
 }
 
@@ -747,10 +745,10 @@ io.on('connection', (socket) => {
       rooms[socket.roomId].game.isFirstTurnOfRound = true; // 1을 내서 새로운 라운드 시작 시 첫 턴 플래그 설정
       setTimeout(() => {
         io.to(socket.roomId).emit('newRound', {turnIdx: rooms[socket.roomId].game.turnIdx, lastPlay: null, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: true});
-        startTurnTimer();
+        startTurnTimer(socket.roomId);
       }, 400); // 약간의 딜레이로 클라가 playResult를 먼저 받게 함
       // playResult 이후의 턴 진행 로직은 여기서 종료
-      clearTurnTimer();
+      clearTurnTimer(socket.roomId);
       // 각 플레이어에게 자신의 myCards를 포함해 playResult 전송
       rooms[socket.roomId].game.ordered.forEach((p, i) => {
         const targetSocket = io.sockets.sockets.get(p.id);
@@ -782,7 +780,7 @@ io.on('connection', (socket) => {
 
     console.log('`finished` array state:', JSON.stringify(rooms[socket.roomId].game.finished));
     
-    clearTurnTimer();
+    clearTurnTimer(socket.roomId);
     rooms[socket.roomId].game.ordered.forEach((p, i) => {
       const targetSocket = io.sockets.sockets.get(p.id);
       if (targetSocket) {
@@ -866,7 +864,7 @@ io.on('connection', (socket) => {
     } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]);
     
     io.to(socket.roomId).emit('turnChanged', { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: false });
-    startTurnTimer();
+    startTurnTimer(socket.roomId);
   });
   
   socket.on('passTurn', (cb) => {
@@ -881,7 +879,7 @@ io.on('connection', (socket) => {
       return cb && cb({success: false, message: '새로운 라운드의 첫 턴에는 패스할 수 없습니다. 카드를 내주세요.'});
     }
     
-    clearTurnTimer();
+    clearTurnTimer(socket.roomId);
     rooms[socket.roomId].game.passes++;
     io.to(socket.roomId).emit('passResult', {playerIdx: idx, passes: rooms[socket.roomId].game.passes});
 
@@ -911,7 +909,7 @@ io.on('connection', (socket) => {
       rooms[socket.roomId].game.lastPlay = null;
       rooms[socket.roomId].game.isFirstTurnOfRound = true; // 새로운 라운드 시작 시 첫 턴 플래그 설정
       io.to(socket.roomId).emit('newRound', {turnIdx: rooms[socket.roomId].game.turnIdx, lastPlay: null, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: true});
-      startTurnTimer();
+      startTurnTimer(socket.roomId);
     } else if (activePlayersCount === 1) {
       // 플레이어가 1명만 남은 경우, 패스할 수 없고 카드를 내야 함
       console.log('*** Only one player remaining. Must play cards. ***');
@@ -921,7 +919,7 @@ io.on('connection', (socket) => {
         rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
       } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]);
       io.to(socket.roomId).emit('turnChanged', { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: false });
-      startTurnTimer();
+      startTurnTimer(socket.roomId);
     }
     
     cb && cb({success: true});
