@@ -105,30 +105,30 @@ function resetGame() {
   };
   
   // players 배열도 정리 (게임 중단 시 모든 플레이어 제거)
-  rooms[req.body.roomId].players = [];
+  rooms[socket.roomId].players = [];
   
-  io.emit('players', rooms[req.body.roomId].players);
+  io.emit('players', rooms[socket.roomId].players);
   
   // 게임이 중단되었음을 클라이언트에게 알림
   io.emit('gameInterrupted', { message: '게임 진행 중에 플레이어가 나가서 게임이 중단되었습니다.' });
 }
 
 function startGameIfReady() {
-  if (rooms[req.body.roomId].game.inProgress) return;
+  if (rooms[socket.roomId].game.inProgress) return;
   
   // 카드 교환 단계가 진행 중이면 게임 시작하지 않음
-  if (rooms[req.body.roomId].game.cardExchangeInProgress) {
+  if (rooms[socket.roomId].game.cardExchangeInProgress) {
     console.log('카드 교환 단계가 진행 중이므로 게임 시작을 건너뜁니다.');
     return;
   }
 
-  if (rooms[req.body.roomId].players.length >= MIN_PLAYERS && rooms[req.body.roomId].players.length <= MAX_PLAYERS && rooms[req.body.roomId].players.every(p => p.ready)) {
+  if (rooms[socket.roomId].players.length >= MIN_PLAYERS && rooms[socket.roomId].players.length <= MAX_PLAYERS && rooms[socket.roomId].players.every(p => p.ready)) {
     console.log('게임 시작 조건 충족! 데이터 준비 중...');
-    rooms[req.body.roomId].game.inProgress = true;
+    rooms[socket.roomId].game.inProgress = true;
     
     // 1. 숫자 뽑기
     const numbers = [];
-    while (numbers.length < rooms[req.body.roomId].players.length) {
+    while (numbers.length < rooms[socket.roomId].players.length) {
       const n = Math.floor(Math.random() * 12) + 1;
       if (!numbers.includes(n)) numbers.push(n);
     }
@@ -137,53 +137,53 @@ function startGameIfReady() {
     let picked;
     // 인원에 따른 신분 배정
     let roles;
-    if (rooms[req.body.roomId].players.length === 4) {
+    if (rooms[socket.roomId].players.length === 4) {
       roles = ['달무티', '대주교', '광부', '노예'];
-    } else if (rooms[req.body.roomId].players.length === 5) {
+    } else if (rooms[socket.roomId].players.length === 5) {
       roles = ['달무티', '대주교', '평민', '광부', '노예'];
-    } else if (rooms[req.body.roomId].players.length === 6) {
+    } else if (rooms[socket.roomId].players.length === 6) {
       roles = ['달무티', '대주교', '평민', '평민', '광부', '노예'];
-    } else if (rooms[req.body.roomId].players.length === 7) {
+    } else if (rooms[socket.roomId].players.length === 7) {
       roles = ['달무티', '대주교', '평민', '평민', '평민', '광부', '노예'];
-    } else if (rooms[req.body.roomId].players.length === 8) {
+    } else if (rooms[socket.roomId].players.length === 8) {
       roles = ['달무티', '대주교', '평민', '평민', '평민', '평민', '광부', '노예'];
     }
     // 디버깅: players와 lastGameScores 매칭 상태 출력
-    console.log('players:', rooms[req.body.roomId].players.map((p, i) => `${i}: ${p.nickname}`));
-    console.log('lastGameScores:', rooms[req.body.roomId].game.lastGameScores);
-    if (rooms[req.body.roomId].game.gameCount && rooms[req.body.roomId].game.gameCount > 1 && Object.keys(rooms[req.body.roomId].game.lastGameScores).length === rooms[req.body.roomId].players.length) {
+    console.log('players:', rooms[socket.roomId].players.map((p, i) => `${i}: ${p.nickname}`));
+    console.log('lastGameScores:', rooms[socket.roomId].game.lastGameScores);
+    if (rooms[socket.roomId].game.gameCount && rooms[socket.roomId].game.gameCount > 1 && Object.keys(rooms[socket.roomId].game.lastGameScores).length === rooms[socket.roomId].players.length) {
       // 두 번째 게임부터는 바로 전 게임 점수 높은 순으로 역할 배정
-      picked = rooms[req.body.roomId].players.map((p) => ({
+      picked = rooms[socket.roomId].players.map((p) => ({
         id: p.id,
         nickname: p.nickname,
-        score: rooms[req.body.roomId].game.lastGameScores[p.nickname] || 0
+        score: rooms[socket.roomId].game.lastGameScores[p.nickname] || 0
       }));
       picked.sort((a, b) => b.score - a.score);
       // 디버깅: picked와 roles 매칭 상태 출력
       console.log('picked:', picked.map(p => `${p.nickname}:${p.score}`));
       console.log('roles:', roles);
       console.log('배정:', picked.map((p, i) => `${p.nickname} => ${roles[i]}`));
-      rooms[req.body.roomId].game.ordered = picked.map((p, i) => ({ ...p, role: roles[i] }));
+      rooms[socket.roomId].game.ordered = picked.map((p, i) => ({ ...p, role: roles[i] }));
     } else {
       // 첫 게임은 랜덤
-      picked = rooms[req.body.roomId].players.map((p, i) => ({ id: p.id, nickname: p.nickname, card: 0 }));
+      picked = rooms[socket.roomId].players.map((p, i) => ({ id: p.id, nickname: p.nickname, card: 0 }));
       const numbers = [];
-      while (numbers.length < rooms[req.body.roomId].players.length) {
+      while (numbers.length < rooms[socket.roomId].players.length) {
         const n = Math.floor(Math.random() * 12) + 1;
         if (!numbers.includes(n)) numbers.push(n);
       }
       picked.forEach((p,i) => p.card = numbers[i]);
       picked.sort((a, b) => a.card - b.card);
-      rooms[req.body.roomId].game.ordered = picked.map((p, i) => ({ ...p, role: roles[i] }));
+      rooms[socket.roomId].game.ordered = picked.map((p, i) => ({ ...p, role: roles[i] }));
     }
 
     // 3. 게임 상태 초기화
-    rooms[req.body.roomId].game.turnIdx = 0;
-    rooms[req.body.roomId].game.lastPlay = null;
-    rooms[req.body.roomId].game.passes = 0;
-    rooms[req.body.roomId].game.finished = Array(rooms[req.body.roomId].game.ordered.length).fill(false);
-    rooms[req.body.roomId].game.finishOrder = [];
-    rooms[req.body.roomId].game.isFirstTurnOfRound = true; // 게임 시작 시 첫 턴 플래그 설정
+    rooms[socket.roomId].game.turnIdx = 0;
+    rooms[socket.roomId].game.lastPlay = null;
+    rooms[socket.roomId].game.passes = 0;
+    rooms[socket.roomId].game.finished = Array(rooms[socket.roomId].game.ordered.length).fill(false);
+    rooms[socket.roomId].game.finishOrder = [];
+    rooms[socket.roomId].game.isFirstTurnOfRound = true; // 게임 시작 시 첫 턴 플래그 설정
     // gameCount, lastGameScores, totalScores는 게임이 완전히 끝날 때 초기화하거나 다음 라운드 시작 시 해야 함
 
     // 4. 카드 분배 및 저장
@@ -198,31 +198,31 @@ function startGameIfReady() {
       [deck[i], deck[j]] = [deck[j], deck[i]];
     }
     
-    const hands = Array(rooms[req.body.roomId].game.ordered.length).fill(null).map(() => []);
+    const hands = Array(rooms[socket.roomId].game.ordered.length).fill(null).map(() => []);
     let cardDealIndex = 0;
     
     // 인원에 따른 카드 배분
     let baseCards, dalmutiExtraCards;
-    if (rooms[req.body.roomId].players.length === 4) {
+    if (rooms[socket.roomId].players.length === 4) {
       baseCards = 20;
       dalmutiExtraCards = 0;
-    } else if (rooms[req.body.roomId].players.length === 5) {
+    } else if (rooms[socket.roomId].players.length === 5) {
       baseCards = 16;
       dalmutiExtraCards = 0;
-    } else if (rooms[req.body.roomId].players.length === 6) {
+    } else if (rooms[socket.roomId].players.length === 6) {
       baseCards = 13;
       dalmutiExtraCards = 2; // 달무티만 15장
-    } else if (rooms[req.body.roomId].players.length === 7) {
+    } else if (rooms[socket.roomId].players.length === 7) {
       baseCards = 11;
       dalmutiExtraCards = 3; // 달무티만 14장
-    } else if (rooms[req.body.roomId].players.length === 8) {
+    } else if (rooms[socket.roomId].players.length === 8) {
       baseCards = 10;
       dalmutiExtraCards = 0;
     }
     
     // 기본 카드 분배 (라운드-로빈 방식)
     for (let i = 0; i < baseCards; i++) {
-      for (let j = 0; j < rooms[req.body.roomId].game.ordered.length; j++) {
+      for (let j = 0; j < rooms[socket.roomId].game.ordered.length; j++) {
         if(deck[cardDealIndex]) {
           hands[j].push(deck[cardDealIndex++]);
         }
@@ -230,7 +230,7 @@ function startGameIfReady() {
     }
 
     // 달무티에게 추가 카드 분배
-    const dalmutiIdx = rooms[req.body.roomId].game.ordered.findIndex(p => p.role === '달무티');
+    const dalmutiIdx = rooms[socket.roomId].game.ordered.findIndex(p => p.role === '달무티');
     if (dalmutiIdx !== -1 && dalmutiExtraCards > 0) {
       for (let i = 0; i < dalmutiExtraCards; i++) {
         if(deck[cardDealIndex]) {
@@ -241,16 +241,16 @@ function startGameIfReady() {
     
     // 각 손패를 정렬
     hands.forEach(hand => hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b)));
-    rooms[req.body.roomId].game.playerHands = hands; // 더 이상 map, slice 필요 없음. 위에서부터 격리됨.
+    rooms[socket.roomId].game.playerHands = hands; // 더 이상 map, slice 필요 없음. 위에서부터 격리됨.
 
     // 5. 카드 교환 단계 (농노 ↔ 달무티, 광부 ↔ 대주교)
-    const slaveIdx = rooms[req.body.roomId].game.ordered.findIndex(p => p.role === '노예');
-    const minerIdx = rooms[req.body.roomId].game.ordered.findIndex(p => p.role === '광부');
-    const archbishopIdx = rooms[req.body.roomId].game.ordered.findIndex(p => p.role === '대주교');
+    const slaveIdx = rooms[socket.roomId].game.ordered.findIndex(p => p.role === '노예');
+    const minerIdx = rooms[socket.roomId].game.ordered.findIndex(p => p.role === '광부');
+    const archbishopIdx = rooms[socket.roomId].game.ordered.findIndex(p => p.role === '대주교');
     
     if (dalmutiIdx !== -1 && slaveIdx !== -1) {
       // 농노의 손패에서 가장 낮은 숫자 2장 찾기 (자동)
-      const slaveHand = [...rooms[req.body.roomId].game.playerHands[slaveIdx]];
+      const slaveHand = [...rooms[socket.roomId].game.playerHands[slaveIdx]];
       slaveHand.sort((a, b) => {
         const aVal = a === 'J' ? 13 : a;
         const bVal = b === 'J' ? 13 : b;
@@ -260,23 +260,23 @@ function startGameIfReady() {
       
       // 농노의 카드를 달무티에게 전달
       lowestCards.forEach(card => {
-        const cardIndex = rooms[req.body.roomId].game.playerHands[slaveIdx].indexOf(card);
+        const cardIndex = rooms[socket.roomId].game.playerHands[slaveIdx].indexOf(card);
         if (cardIndex > -1) {
-          rooms[req.body.roomId].game.playerHands[slaveIdx].splice(cardIndex, 1);
-          rooms[req.body.roomId].game.playerHands[dalmutiIdx].push(card);
+          rooms[socket.roomId].game.playerHands[slaveIdx].splice(cardIndex, 1);
+          rooms[socket.roomId].game.playerHands[dalmutiIdx].push(card);
         }
       });
       // 카드 교환 후 손패 정렬
-      rooms[req.body.roomId].game.playerHands.forEach(hand => hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b)));
-      console.log(`농노(${rooms[req.body.roomId].game.ordered[slaveIdx].nickname})가 달무티에게 카드 전달: [${lowestCards.join(',')}]`);
+      rooms[socket.roomId].game.playerHands.forEach(hand => hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b)));
+      console.log(`농노(${rooms[socket.roomId].game.ordered[slaveIdx].nickname})가 달무티에게 카드 전달: [${lowestCards.join(',')}]`);
       // 카드 교환 완료 플래그 설정
-      rooms[req.body.roomId].game.cardExchangeInProgress = true;
-      rooms[req.body.roomId].game.slaveCardsGiven = lowestCards;
+      rooms[socket.roomId].game.cardExchangeInProgress = true;
+      rooms[socket.roomId].game.slaveCardsGiven = lowestCards;
     }
     
     if (minerIdx !== -1 && archbishopIdx !== -1) {
       // 광부의 손패에서 가장 낮은 숫자 1장 찾기 (자동)
-      const minerHand = [...rooms[req.body.roomId].game.playerHands[minerIdx]];
+      const minerHand = [...rooms[socket.roomId].game.playerHands[minerIdx]];
       minerHand.sort((a, b) => {
         const aVal = a === 'J' ? 13 : a;
         const bVal = b === 'J' ? 13 : b;
@@ -285,35 +285,35 @@ function startGameIfReady() {
       const lowestCard = minerHand[0];
       
       // 광부의 카드를 대주교에게 전달
-      const cardIndex = rooms[req.body.roomId].game.playerHands[minerIdx].indexOf(lowestCard);
+      const cardIndex = rooms[socket.roomId].game.playerHands[minerIdx].indexOf(lowestCard);
       if (cardIndex > -1) {
-        rooms[req.body.roomId].game.playerHands[minerIdx].splice(cardIndex, 1);
-        rooms[req.body.roomId].game.playerHands[archbishopIdx].push(lowestCard);
+        rooms[socket.roomId].game.playerHands[minerIdx].splice(cardIndex, 1);
+        rooms[socket.roomId].game.playerHands[archbishopIdx].push(lowestCard);
       }
       // 카드 교환 후 손패 정렬
-      rooms[req.body.roomId].game.playerHands.forEach(hand => hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b)));
-      console.log(`광부(${rooms[req.body.roomId].game.ordered[minerIdx].nickname})가 대주교에게 카드 전달: [${lowestCard}]`);
+      rooms[socket.roomId].game.playerHands.forEach(hand => hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b)));
+      console.log(`광부(${rooms[socket.roomId].game.ordered[minerIdx].nickname})가 대주교에게 카드 전달: [${lowestCard}]`);
       // 카드 교환 완료 플래그 설정
-      rooms[req.body.roomId].game.cardExchangeInProgress = true;
-      rooms[req.body.roomId].game.minerCardsGiven = [lowestCard];
+      rooms[socket.roomId].game.cardExchangeInProgress = true;
+      rooms[socket.roomId].game.minerCardsGiven = [lowestCard];
     }
     
-    if (rooms[req.body.roomId].game.cardExchangeInProgress) {
+    if (rooms[socket.roomId].game.cardExchangeInProgress) {
       console.log('=== 카드 교환 단계 시작 설정 ===');
-      console.log(`cardExchangeInProgress: ${rooms[req.body.roomId].game.cardExchangeInProgress}`);
-      if (rooms[req.body.roomId].game.slaveCardsGiven.length > 0) {
-        console.log(`slaveCardsGiven: [${rooms[req.body.roomId].game.slaveCardsGiven.join(',')}]`);
+      console.log(`cardExchangeInProgress: ${rooms[socket.roomId].game.cardExchangeInProgress}`);
+      if (rooms[socket.roomId].game.slaveCardsGiven.length > 0) {
+        console.log(`slaveCardsGiven: [${rooms[socket.roomId].game.slaveCardsGiven.join(',')}]`);
       }
-      if (rooms[req.body.roomId].game.minerCardsGiven.length > 0) {
-        console.log(`minerCardsGiven: [${rooms[req.body.roomId].game.minerCardsGiven.join(',')}]`);
+      if (rooms[socket.roomId].game.minerCardsGiven.length > 0) {
+        console.log(`minerCardsGiven: [${rooms[socket.roomId].game.minerCardsGiven.join(',')}]`);
       }
       
       // 카드 선택 완료 상태 초기화
-      rooms[req.body.roomId].game.dalmutiCardSelected = false;
-      rooms[req.body.roomId].game.archbishopCardSelected = false;
+      rooms[socket.roomId].game.dalmutiCardSelected = false;
+      rooms[socket.roomId].game.archbishopCardSelected = false;
       
       // 먼저 클라이언트들에게 게임 페이지로 이동하라고 알림
-      io.to(req.body.roomId).emit('gameStart');
+      io.to(socket.roomId).emit('gameStart');
       console.log('gameStart 이벤트 전송. 클라이언트들이 game.html로 이동합니다.');
       
       // 3초 후에 카드 선택 요청 (클라이언트들이 game.html로 이동할 시간을 줌)
@@ -322,21 +322,21 @@ function startGameIfReady() {
         
         // 달무티 카드 선택 요청
         if (dalmutiIdx !== -1 && slaveIdx !== -1) {
-          console.log(`달무티 ID: ${rooms[req.body.roomId].game.ordered[dalmutiIdx].id}`);
-          console.log(`달무티 닉네임: ${rooms[req.body.roomId].game.ordered[dalmutiIdx].nickname}`);
-          console.log(`달무티 손패: [${rooms[req.body.roomId].game.playerHands[dalmutiIdx].join(',')}]`);
+          console.log(`달무티 ID: ${rooms[socket.roomId].game.ordered[dalmutiIdx].id}`);
+          console.log(`달무티 닉네임: ${rooms[socket.roomId].game.ordered[dalmutiIdx].nickname}`);
+          console.log(`달무티 손패: [${rooms[socket.roomId].game.playerHands[dalmutiIdx].join(',')}]`);
           
           // 달무티에게 카드 선택 요청
-          io.to(rooms[req.body.roomId].game.ordered[dalmutiIdx].id).emit('selectCardsForSlave', {
+          io.to(rooms[socket.roomId].game.ordered[dalmutiIdx].id).emit('selectCardsForSlave', {
             message: '농노에게 줄 카드 2장을 선택하세요.',
-            hand: rooms[req.body.roomId].game.playerHands[dalmutiIdx]
+            hand: rooms[socket.roomId].game.playerHands[dalmutiIdx]
           });
-          console.log(`달무티(${rooms[req.body.roomId].game.ordered[dalmutiIdx].nickname})에게 selectCardsForSlave 이벤트 전송 완료`);
-          console.log(`달무티 소켓 ID: ${rooms[req.body.roomId].game.ordered[dalmutiIdx].id}`);
-          console.log(`달무티 손패 개수: ${rooms[req.body.roomId].game.playerHands[dalmutiIdx].length}장`);
+          console.log(`달무티(${rooms[socket.roomId].game.ordered[dalmutiIdx].nickname})에게 selectCardsForSlave 이벤트 전송 완료`);
+          console.log(`달무티 소켓 ID: ${rooms[socket.roomId].game.ordered[dalmutiIdx].id}`);
+          console.log(`달무티 손패 개수: ${rooms[socket.roomId].game.playerHands[dalmutiIdx].length}장`);
           
           // 달무티가 실제로 연결되어 있는지 확인
-          const dalmutiSocket = io.sockets.sockets.get(rooms[req.body.roomId].game.ordered[dalmutiIdx].id);
+          const dalmutiSocket = io.sockets.sockets.get(rooms[socket.roomId].game.ordered[dalmutiIdx].id);
           if (dalmutiSocket) {
             console.log('달무티 소켓이 연결되어 있습니다.');
           } else {
@@ -346,21 +346,21 @@ function startGameIfReady() {
         
         // 대주교 카드 선택 요청
         if (archbishopIdx !== -1 && minerIdx !== -1) {
-          console.log(`대주교 ID: ${rooms[req.body.roomId].game.ordered[archbishopIdx].id}`);
-          console.log(`대주교 닉네임: ${rooms[req.body.roomId].game.ordered[archbishopIdx].nickname}`);
-          console.log(`대주교 손패: [${rooms[req.body.roomId].game.playerHands[archbishopIdx].join(',')}]`);
+          console.log(`대주교 ID: ${rooms[socket.roomId].game.ordered[archbishopIdx].id}`);
+          console.log(`대주교 닉네임: ${rooms[socket.roomId].game.ordered[archbishopIdx].nickname}`);
+          console.log(`대주교 손패: [${rooms[socket.roomId].game.playerHands[archbishopIdx].join(',')}]`);
           
           // 대주교에게 카드 선택 요청
-          io.to(rooms[req.body.roomId].game.ordered[archbishopIdx].id).emit('selectCardsForMiner', {
+          io.to(rooms[socket.roomId].game.ordered[archbishopIdx].id).emit('selectCardsForMiner', {
             message: '광부에게 줄 카드 1장을 선택하세요.',
-            hand: rooms[req.body.roomId].game.playerHands[archbishopIdx]
+            hand: rooms[socket.roomId].game.playerHands[archbishopIdx]
           });
-          console.log(`대주교(${rooms[req.body.roomId].game.ordered[archbishopIdx].nickname})에게 selectCardsForMiner 이벤트 전송 완료`);
-          console.log(`대주교 소켓 ID: ${rooms[req.body.roomId].game.ordered[archbishopIdx].id}`);
-          console.log(`대주교 손패 개수: ${rooms[req.body.roomId].game.playerHands[archbishopIdx].length}장`);
+          console.log(`대주교(${rooms[socket.roomId].game.ordered[archbishopIdx].nickname})에게 selectCardsForMiner 이벤트 전송 완료`);
+          console.log(`대주교 소켓 ID: ${rooms[socket.roomId].game.ordered[archbishopIdx].id}`);
+          console.log(`대주교 손패 개수: ${rooms[socket.roomId].game.playerHands[archbishopIdx].length}장`);
           
           // 대주교가 실제로 연결되어 있는지 확인
-          const archbishopSocket = io.sockets.sockets.get(rooms[req.body.roomId].game.ordered[archbishopIdx].id);
+          const archbishopSocket = io.sockets.sockets.get(rooms[socket.roomId].game.ordered[archbishopIdx].id);
           if (archbishopSocket) {
             console.log('대주교 소켓이 연결되어 있습니다.');
           } else {
@@ -369,15 +369,15 @@ function startGameIfReady() {
         }
         
         // 다른 플레이어들에게 대기 메시지
-        rooms[req.body.roomId].game.ordered.forEach((p, i) => {
+        rooms[socket.roomId].game.ordered.forEach((p, i) => {
           if (i !== dalmutiIdx && i !== archbishopIdx) {
             let waitingMessage = '';
             if (dalmutiIdx !== -1 && archbishopIdx !== -1) {
-              waitingMessage = `${rooms[req.body.roomId].game.ordered[dalmutiIdx].nickname}님과 ${rooms[req.body.roomId].game.ordered[archbishopIdx].nickname}님이 카드 교환을 진행하고 있습니다...`;
+              waitingMessage = `${rooms[socket.roomId].game.ordered[dalmutiIdx].nickname}님과 ${rooms[socket.roomId].game.ordered[archbishopIdx].nickname}님이 카드 교환을 진행하고 있습니다...`;
             } else if (dalmutiIdx !== -1) {
-              waitingMessage = `${rooms[req.body.roomId].game.ordered[dalmutiIdx].nickname}님이 농노에게 줄 카드를 선택하고 있습니다...`;
+              waitingMessage = `${rooms[socket.roomId].game.ordered[dalmutiIdx].nickname}님이 농노에게 줄 카드를 선택하고 있습니다...`;
             } else if (archbishopIdx !== -1) {
-              waitingMessage = `${rooms[req.body.roomId].game.ordered[archbishopIdx].nickname}님이 광부에게 줄 카드를 선택하고 있습니다...`;
+              waitingMessage = `${rooms[socket.roomId].game.ordered[archbishopIdx].nickname}님이 광부에게 줄 카드를 선택하고 있습니다...`;
             }
             
             io.to(p.id).emit('waitingForCardExchange', {
@@ -403,24 +403,24 @@ function startGameIfReady() {
 function startGameAfterCardExchange() {
   console.log('=== startGameAfterCardExchange 함수 호출 ===');
   console.log('카드 교환 완료! 게임을 시작합니다.');
-  console.log(`게임 진행 중: ${rooms[req.body.roomId].game.inProgress}`);
-  console.log(`카드 교환 진행 중: ${rooms[req.body.roomId].game.cardExchangeInProgress}`);
+  console.log(`게임 진행 중: ${rooms[socket.roomId].game.inProgress}`);
+  console.log(`카드 교환 진행 중: ${rooms[socket.roomId].game.cardExchangeInProgress}`);
   
   // 카드 교환 완료 플래그 및 상태 초기화
-  rooms[req.body.roomId].game.cardExchangeInProgress = false;
-  rooms[req.body.roomId].game.slaveCardsGiven = [];
-  rooms[req.body.roomId].game.minerCardsGiven = [];
-  rooms[req.body.roomId].game.dalmutiCardSelected = false;
-  rooms[req.body.roomId].game.archbishopCardSelected = false;
+  rooms[socket.roomId].game.cardExchangeInProgress = false;
+  rooms[socket.roomId].game.slaveCardsGiven = [];
+  rooms[socket.roomId].game.minerCardsGiven = [];
+  rooms[socket.roomId].game.dalmutiCardSelected = false;
+  rooms[socket.roomId].game.archbishopCardSelected = false;
   
   // 바로 게임 세팅 데이터 전송
-  rooms[req.body.roomId].game.ordered.forEach((p, i) => {
-    console.log(`${p.nickname}에게 gameSetup 전송 - 카드 ${rooms[req.body.roomId].game.playerHands[i].length}장`);
-    io.to(req.body.roomId).emit('gameSetup', {
-      ordered: rooms[req.body.roomId].game.ordered.map((p, i) => ({ ...p, cardCount: rooms[req.body.roomId].game.playerHands[i].length, finished: rooms[req.body.roomId].game.finished[i] })),
-      myCards: rooms[req.body.roomId].game.playerHands[i],
-      turnInfo: { turnIdx: rooms[req.body.roomId].game.turnIdx, currentPlayer: rooms[req.body.roomId].game.ordered[rooms[req.body.roomId].game.turnIdx], isFirstTurnOfRound: rooms[req.body.roomId].game.isFirstTurnOfRound },
-      field: rooms[req.body.roomId].game.lastPlay
+  rooms[socket.roomId].game.ordered.forEach((p, i) => {
+    console.log(`${p.nickname}에게 gameSetup 전송 - 카드 ${rooms[socket.roomId].game.playerHands[i].length}장`);
+    io.to(socket.roomId).emit('gameSetup', {
+      ordered: rooms[socket.roomId].game.ordered.map((p, i) => ({ ...p, cardCount: rooms[socket.roomId].game.playerHands[i].length, finished: rooms[socket.roomId].game.finished[i] })),
+      myCards: rooms[socket.roomId].game.playerHands[i],
+      turnInfo: { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: rooms[socket.roomId].game.isFirstTurnOfRound },
+      field: rooms[socket.roomId].game.lastPlay
     });
   });
   console.log('gameSetup 데이터 전송 완료.');
@@ -434,9 +434,9 @@ function startTurnTimer() {
   if (turnTimer) clearTimeout(turnTimer);
   turnTimer = setTimeout(() => {
     // 현재 턴의 플레이어가 아직 행동하지 않았다면 자동 패스
-    const currentPlayer = rooms[req.body.roomId].game.ordered[rooms[req.body.roomId].game.turnIdx];
-    if (!rooms[req.body.roomId].game.finished[rooms[req.body.roomId].game.turnIdx]) {
-      io.to(req.body.roomId).emit('turnTimeout'); // 클라이언트에 알림
+    const currentPlayer = rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx];
+    if (!rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]) {
+      io.to(socket.roomId).emit('turnTimeout'); // 클라이언트에 알림
       // 서버에서 자동 패스 처리
       // passTurn 로직을 직접 호출
       autoPassTurn(currentPlayer.id);
@@ -450,38 +450,38 @@ function clearTurnTimer() {
 }
 
 function autoPassTurn(socketId) {
-  const idx = rooms[req.body.roomId].game.ordered.findIndex(p => p.id === socketId);
-  if (!rooms[req.body.roomId].game.inProgress || idx !== rooms[req.body.roomId].game.turnIdx || rooms[req.body.roomId].game.finished[idx]) return;
+  const idx = rooms[socket.roomId].game.ordered.findIndex(p => p.id === socketId);
+  if (!rooms[socket.roomId].game.inProgress || idx !== rooms[socket.roomId].game.turnIdx || rooms[socket.roomId].game.finished[idx]) return;
   
   // 타임오버로 인한 자동 패스는 첫 턴이라도 허용
-  console.log(`\n--- [autoPassTurn] ${rooms[req.body.roomId].game.ordered[idx].nickname}이 타임오버로 자동 패스됨 (첫 턴 여부: ${rooms[req.body.roomId].game.isFirstTurnOfRound}) ---`);
+  console.log(`\n--- [autoPassTurn] ${rooms[socket.roomId].game.ordered[idx].nickname}이 타임오버로 자동 패스됨 (첫 턴 여부: ${rooms[socket.roomId].game.isFirstTurnOfRound}) ---`);
   
-  rooms[req.body.roomId].game.passes++;
-  io.to(req.body.roomId).emit('passResult', {playerIdx: idx, passes: rooms[req.body.roomId].game.passes});
+  rooms[socket.roomId].game.passes++;
+  io.to(socket.roomId).emit('passResult', {playerIdx: idx, passes: rooms[socket.roomId].game.passes});
   // 현재 게임에 참여 중인(완주하지 않은) 플레이어 수 계산
-  const activePlayersCount = rooms[req.body.roomId].players.length - rooms[req.body.roomId].game.finished.filter(f => f).length;
-  if (rooms[req.body.roomId].game.passes >= activePlayersCount-1 && activePlayersCount > 1) {
-    rooms[req.body.roomId].game.passes = 0;
-    if (rooms[req.body.roomId].game.lastPlay) {
-      rooms[req.body.roomId].game.turnIdx = rooms[req.body.roomId].game.lastPlay.playerIdx;
-      if (rooms[req.body.roomId].game.finished[rooms[req.body.roomId].game.turnIdx]) {
+  const activePlayersCount = rooms[socket.roomId].players.length - rooms[socket.roomId].game.finished.filter(f => f).length;
+  if (rooms[socket.roomId].game.passes >= activePlayersCount-1 && activePlayersCount > 1) {
+    rooms[socket.roomId].game.passes = 0;
+    if (rooms[socket.roomId].game.lastPlay) {
+      rooms[socket.roomId].game.turnIdx = rooms[socket.roomId].game.lastPlay.playerIdx;
+      if (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]) {
         do {
-          rooms[req.body.roomId].game.turnIdx = (rooms[req.body.roomId].game.turnIdx + 1) % rooms[req.body.roomId].game.ordered.length;
-        } while (rooms[req.body.roomId].game.finished[rooms[req.body.roomId].game.turnIdx]);
+          rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
+        } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]);
       }
     }
-    rooms[req.body.roomId].game.lastPlay = null;
-    rooms[req.body.roomId].game.isFirstTurnOfRound = true; // 새로운 라운드 시작 시 첫 턴 플래그 설정
-    io.to(req.body.roomId).emit('newRound', {turnIdx: rooms[req.body.roomId].game.turnIdx, lastPlay: null, currentPlayer: rooms[req.body.roomId].game.ordered[rooms[req.body.roomId].game.turnIdx], isFirstTurnOfRound: true});
+    rooms[socket.roomId].game.lastPlay = null;
+    rooms[socket.roomId].game.isFirstTurnOfRound = true; // 새로운 라운드 시작 시 첫 턴 플래그 설정
+    io.to(socket.roomId).emit('newRound', {turnIdx: rooms[socket.roomId].game.turnIdx, lastPlay: null, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: true});
     startTurnTimer();
   } else if (activePlayersCount === 1) {
     // 플레이어가 1명만 남은 경우, 패스할 수 없고 카드를 내야 함
     // 패스 처리는 하지 않고 턴을 그대로 유지
   } else {
     do {
-      rooms[req.body.roomId].game.turnIdx = (rooms[req.body.roomId].game.turnIdx + 1) % rooms[req.body.roomId].game.ordered.length;
-    } while (rooms[req.body.roomId].game.finished[rooms[req.body.roomId].game.turnIdx]);
-    io.to(req.body.roomId).emit('turnChanged', { turnIdx: rooms[req.body.roomId].game.turnIdx, currentPlayer: rooms[req.body.roomId].game.ordered[rooms[req.body.roomId].game.turnIdx], isFirstTurnOfRound: false });
+      rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
+    } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]);
+    io.to(socket.roomId).emit('turnChanged', { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: false });
     startTurnTimer();
   }
 }
@@ -507,22 +507,22 @@ io.on('connection', (socket) => {
       const playerIndex = room.game.ordered.findIndex(p => p.nickname === nickname);
       if (playerIndex !== -1) {
         console.log(`게임 참가자 ${nickname}가 game.html에 연결했습니다.`);
-        console.log(`이전 소켓 ID: ${rooms[req.body.roomId].game.ordered[playerIndex].id}`);
+        console.log(`이전 소켓 ID: ${rooms[socket.roomId].game.ordered[playerIndex].id}`);
         console.log(`새로운 소켓 ID: ${socket.id}`);
         
         // 새로운 소켓 ID로 플레이어 정보 업데이트
-        rooms[req.body.roomId].game.ordered[playerIndex].id = socket.id;
-        const playerInLobbyList = rooms[req.body.roomId].players.find(p => p.nickname === nickname);
+        rooms[socket.roomId].game.ordered[playerIndex].id = socket.id;
+        const playerInLobbyList = rooms[socket.roomId].players.find(p => p.nickname === nickname);
         if (playerInLobbyList) playerInLobbyList.id = socket.id;
 
         console.log(`소켓 ID 업데이트 완료: ${nickname} -> ${socket.id}`);
         
         // --- 재접속 시 상태에 따른 분기 처리 ---
-        if (rooms[req.body.roomId].game.cardExchangeInProgress) {
-          const dalmutiIdx = rooms[req.body.roomId].game.ordered.findIndex(p => p.role === '달무티');
-          const archbishopIdx = rooms[req.body.roomId].game.ordered.findIndex(p => p.role === '대주교');
-          const dalmuti = rooms[req.body.roomId].game.ordered[dalmutiIdx];
-          const archbishop = rooms[req.body.roomId].game.ordered[archbishopIdx];
+        if (rooms[socket.roomId].game.cardExchangeInProgress) {
+          const dalmutiIdx = rooms[socket.roomId].game.ordered.findIndex(p => p.role === '달무티');
+          const archbishopIdx = rooms[socket.roomId].game.ordered.findIndex(p => p.role === '대주교');
+          const dalmuti = rooms[socket.roomId].game.ordered[dalmutiIdx];
+          const archbishop = rooms[socket.roomId].game.ordered[archbishopIdx];
 
           if (playerIndex === dalmutiIdx) {
             // 재접속한 플레이어가 '달무티'인 경우
@@ -530,7 +530,7 @@ io.on('connection', (socket) => {
             setTimeout(() => { // 클라이언트가 준비될 시간을 줍니다.
               io.to(socket.id).emit('selectCardsForSlave', {
                 message: '농노에게 줄 카드 2장을 선택하세요.',
-                hand: rooms[req.body.roomId].game.playerHands[playerIndex]
+                hand: rooms[socket.roomId].game.playerHands[playerIndex]
               });
             }, 500);
           } else if (playerIndex === archbishopIdx) {
@@ -539,7 +539,7 @@ io.on('connection', (socket) => {
             setTimeout(() => { // 클라이언트가 준비될 시간을 줍니다.
               io.to(socket.id).emit('selectCardsForMiner', {
                 message: '광부에게 줄 카드 1장을 선택하세요.',
-                hand: rooms[req.body.roomId].game.playerHands[playerIndex]
+                hand: rooms[socket.roomId].game.playerHands[playerIndex]
               });
             }, 500);
           } else {
@@ -561,10 +561,10 @@ io.on('connection', (socket) => {
         } else {
           // 카드 교환 단계가 아닐 때만 gameSetup 전송
           io.to(socket.id).emit('gameSetup', {
-            ordered: rooms[req.body.roomId].game.ordered.map((p, i) => ({ ...p, cardCount: rooms[req.body.roomId].game.playerHands[i].length, finished: rooms[req.body.roomId].game.finished[i] })),
-            myCards: rooms[req.body.roomId].game.playerHands[playerIndex],
-            turnInfo: { turnIdx: rooms[req.body.roomId].game.turnIdx, currentPlayer: rooms[req.body.roomId].game.ordered[rooms[req.body.roomId].game.turnIdx], isFirstTurnOfRound: rooms[req.body.roomId].game.isFirstTurnOfRound },
-            field: rooms[req.body.roomId].game.lastPlay
+            ordered: rooms[socket.roomId].game.ordered.map((p, i) => ({ ...p, cardCount: rooms[socket.roomId].game.playerHands[i].length, finished: rooms[socket.roomId].game.finished[i] })),
+            myCards: rooms[socket.roomId].game.playerHands[playerIndex],
+            turnInfo: { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: rooms[socket.roomId].game.isFirstTurnOfRound },
+            field: rooms[socket.roomId].game.lastPlay
           });
         }
         
@@ -590,7 +590,7 @@ io.on('connection', (socket) => {
         return callback && callback({ success: false, message: '게임이 진행 중입니다' });
       }
     }
-    io.to(req.body.roomId).emit('players', room.players);
+    io.to(socket.roomId).emit('players', room.players);
     callback && callback({ success: true });
   });
 
@@ -599,7 +599,7 @@ io.on('connection', (socket) => {
     if (!room) return;
     const player = room.players.find(p => p.id === socket.id);
     if (player) player.ready = true;
-    io.to(req.body.roomId).emit('players', room.players);
+    io.to(socket.roomId).emit('players', room.players);
     if (room.game && !room.game.cardExchangeInProgress) {
       startGameIfReady();
     }
@@ -610,14 +610,14 @@ io.on('connection', (socket) => {
     if (!room) return;
     const player = room.players.find(p => p.id === socket.id);
     if (player) player.ready = false;
-    io.to(req.body.roomId).emit('players', room.players);
+    io.to(socket.roomId).emit('players', room.players);
   });
 
   socket.on('chat', (msg) => {
     const room = rooms[socket.roomId];
     if (!room) return;
     const senderNickname = socket.nickname || 'Unknown';
-    io.to(req.body.roomId).emit('chat', {nickname: senderNickname, msg});
+    io.to(socket.roomId).emit('chat', {nickname: senderNickname, msg});
   });
 
   socket.on('disconnect', () => {
@@ -629,12 +629,12 @@ io.on('connection', (socket) => {
         // 게임 중 재접속 대기
       } else {
         room.players = room.players.filter(p => p.id !== socket.id);
-        io.to(req.body.roomId).emit('players', room.players);
-        socket.leave(req.body.roomId); // 방에서 소켓 제거
+        io.to(socket.roomId).emit('players', room.players);
+        socket.leave(socket.roomId); // 방에서 소켓 제거
       }
     }
     // 방에 아무도 없으면 방 삭제
-    if (room.players.length === 0) deleteRoom(req.body.roomId);
+    if (room.players.length === 0) deleteRoom(socket.roomId);
   });
 
   socket.on('leaveGame', () => {
@@ -642,12 +642,12 @@ io.on('connection', (socket) => {
     if (!room) return;
     socket.emit('resetClient');
     room.players = room.players.filter(p => p.id !== socket.id);
-    io.to(req.body.roomId).emit('players', room.players);
-    socket.leave(req.body.roomId); // 방에서 소켓 제거
+    io.to(socket.roomId).emit('players', room.players);
+    socket.leave(socket.roomId); // 방에서 소켓 제거
     if (room.game && room.game.inProgress) {
       resetGame();
     }
-    if (room.players.length === 0) deleteRoom(req.body.roomId);
+    if (room.players.length === 0) deleteRoom(socket.roomId);
   });
 
   // --- 인게임 플레이 로직 ---
@@ -659,13 +659,13 @@ io.on('connection', (socket) => {
       return cb && cb({success: false, message: '당신의 차례가 아니거나, 게임이 진행중이 아닙니다.'});
     }
 
-    console.log(`\n--- [playCards] Event from ${rooms[req.body.roomId].game.ordered[idx].nickname} (idx: ${idx}) ---`);
+    console.log(`\n--- [playCards] Event from ${rooms[socket.roomId].game.ordered[idx].nickname} (idx: ${idx}) ---`);
     console.log('Cards to play:', cards);
     
     // 유효성 검사 (중복 카드 제출 방지)
-    const hand = rooms[req.body.roomId].game.playerHands[idx];
-    console.log(`Hand of ${rooms[req.body.roomId].game.ordered[idx].nickname} BEFORE play: ${hand.length} cards -> [${hand.join(',')}]`);
-    console.log('All hands BEFORE play:', JSON.stringify(rooms[req.body.roomId].game.playerHands.map(h => h.length)));
+    const hand = rooms[socket.roomId].game.playerHands[idx];
+    console.log(`Hand of ${rooms[socket.roomId].game.ordered[idx].nickname} BEFORE play: ${hand.length} cards -> [${hand.join(',')}]`);
+    console.log('All hands BEFORE play:', JSON.stringify(rooms[socket.roomId].game.playerHands.map(h => h.length)));
 
     const handCounts = hand.reduce((acc, c) => ({...acc, [c]: (acc[c] || 0) + 1 }), {});
     const playedCounts = cards.reduce((acc, c) => ({...acc, [c]: (acc[c] || 0) + 1 }), {});
@@ -691,9 +691,9 @@ io.on('connection', (socket) => {
     
     if (jokerCount === cards.length) num = 13; // 조커만 낼 경우 숫자 13으로 취급
     
-    if (rooms[req.body.roomId].game.lastPlay) {
-      if (cards.length !== rooms[req.body.roomId].game.lastPlay.count) return cb && cb({success: false, message: `이전과 같은 ${rooms[req.body.roomId].game.lastPlay.count}장만 낼 수 있습니다.`});
-      if (num >= rooms[req.body.roomId].game.lastPlay.number) return cb && cb({success: false, message: '이전보다 낮은 숫자만 낼 수 있습니다.'});
+    if (rooms[socket.roomId].game.lastPlay) {
+      if (cards.length !== rooms[socket.roomId].game.lastPlay.count) return cb && cb({success: false, message: `이전과 같은 ${rooms[socket.roomId].game.lastPlay.count}장만 낼 수 있습니다.`});
+      if (num >= rooms[socket.roomId].game.lastPlay.number) return cb && cb({success: false, message: '이전보다 낮은 숫자만 낼 수 있습니다.'});
     }
     
     // 제출 처리
@@ -705,39 +705,39 @@ io.on('connection', (socket) => {
     });
     // 카드 제출 후 손패 정렬
     hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b));
-    rooms[req.body.roomId].game.lastPlay = {count: cards.length, number: num, playerIdx: idx, cards: [...cards]};
-    rooms[req.body.roomId].game.passes = 0;
-    rooms[req.body.roomId].game.isFirstTurnOfRound = false; // 카드를 내면 첫 턴 플래그 해제
+    rooms[socket.roomId].game.lastPlay = {count: cards.length, number: num, playerIdx: idx, cards: [...cards]};
+    rooms[socket.roomId].game.passes = 0;
+    rooms[socket.roomId].game.isFirstTurnOfRound = false; // 카드를 내면 첫 턴 플래그 해제
 
     // 1 또는 1+조커를 낸 경우: 즉시 모든 미완주 플레이어 패스 처리 및 라운드 리셋
     if (num === 1) {
       // 현재 턴을 제외한 미완주 플레이어 인덱스
-      const activeIdxs = rooms[req.body.roomId].game.ordered.map((p, i) => i).filter(i => i !== idx && !rooms[req.body.roomId].game.finished[i]);
+      const activeIdxs = rooms[socket.roomId].game.ordered.map((p, i) => i).filter(i => i !== idx && !rooms[socket.roomId].game.finished[i]);
       activeIdxs.forEach(i => {
-        io.to(req.body.roomId).emit('passResult', {playerIdx: i, passes: rooms[req.body.roomId].game.passes + 1});
+        io.to(socket.roomId).emit('passResult', {playerIdx: i, passes: rooms[socket.roomId].game.passes + 1});
       });
       // 라운드 리셋
-      rooms[req.body.roomId].game.passes = 0;
-      rooms[req.body.roomId].game.turnIdx = idx;
-      rooms[req.body.roomId].game.lastPlay = null;
-      rooms[req.body.roomId].game.isFirstTurnOfRound = true; // 1을 내서 새로운 라운드 시작 시 첫 턴 플래그 설정
+      rooms[socket.roomId].game.passes = 0;
+      rooms[socket.roomId].game.turnIdx = idx;
+      rooms[socket.roomId].game.lastPlay = null;
+      rooms[socket.roomId].game.isFirstTurnOfRound = true; // 1을 내서 새로운 라운드 시작 시 첫 턴 플래그 설정
       setTimeout(() => {
-        io.to(req.body.roomId).emit('newRound', {turnIdx: rooms[req.body.roomId].game.turnIdx, lastPlay: null, currentPlayer: rooms[req.body.roomId].game.ordered[rooms[req.body.roomId].game.turnIdx], isFirstTurnOfRound: true});
+        io.to(socket.roomId).emit('newRound', {turnIdx: rooms[socket.roomId].game.turnIdx, lastPlay: null, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: true});
         startTurnTimer();
       }, 400); // 약간의 딜레이로 클라가 playResult를 먼저 받게 함
       // playResult 이후의 턴 진행 로직은 여기서 종료
       clearTurnTimer();
       // 각 플레이어에게 자신의 myCards를 포함해 playResult 전송
-      rooms[req.body.roomId].game.ordered.forEach((p, i) => {
+      rooms[socket.roomId].game.ordered.forEach((p, i) => {
         const targetSocket = io.sockets.sockets.get(p.id);
         if (targetSocket) {
           targetSocket.emit('playResult', {
             playerIdx: idx,
             cards,
             lastPlay: {count: cards.length, number: num, playerIdx: idx, cards: [...cards]},
-            finished: rooms[req.body.roomId].game.finished,
-            playerHands: rooms[req.body.roomId].game.playerHands.map(hand => hand.length),
-            myCards: rooms[req.body.roomId].game.playerHands[i]
+            finished: rooms[socket.roomId].game.finished,
+            playerHands: rooms[socket.roomId].game.playerHands.map(hand => hand.length),
+            myCards: rooms[socket.roomId].game.playerHands[i]
           });
         }
       });
@@ -745,90 +745,90 @@ io.on('connection', (socket) => {
       return;
     }
 
-    console.log(`Hand of ${rooms[req.body.roomId].game.ordered[idx].nickname} AFTER play: ${hand.length} cards`);
-    console.log('All hands AFTER play:', JSON.stringify(rooms[req.body.roomId].game.playerHands.map(h => h.length)));
+    console.log(`Hand of ${rooms[socket.roomId].game.ordered[idx].nickname} AFTER play: ${hand.length} cards`);
+    console.log('All hands AFTER play:', JSON.stringify(rooms[socket.roomId].game.playerHands.map(h => h.length)));
     
     if (hand.length === 0) {
-      if (!rooms[req.body.roomId].game.finished[idx]) {
-        rooms[req.body.roomId].game.finished[idx] = true;
-        rooms[req.body.roomId].game.finishOrder.push(idx);
-        console.log(`*** ${rooms[req.body.roomId].game.ordered[idx].nickname} has finished! ***`);
+      if (!rooms[socket.roomId].game.finished[idx]) {
+        rooms[socket.roomId].game.finished[idx] = true;
+        rooms[socket.roomId].game.finishOrder.push(idx);
+        console.log(`*** ${rooms[socket.roomId].game.ordered[idx].nickname} has finished! ***`);
       }
     }
 
-    console.log('`finished` array state:', JSON.stringify(rooms[req.body.roomId].game.finished));
+    console.log('`finished` array state:', JSON.stringify(rooms[socket.roomId].game.finished));
     
     clearTurnTimer();
-    rooms[req.body.roomId].game.ordered.forEach((p, i) => {
+    rooms[socket.roomId].game.ordered.forEach((p, i) => {
       const targetSocket = io.sockets.sockets.get(p.id);
       if (targetSocket) {
         targetSocket.emit('playResult', {
           playerIdx: idx,
           cards,
-          lastPlay: rooms[req.body.roomId].game.lastPlay,
-          finished: rooms[req.body.roomId].game.finished,
-          playerHands: rooms[req.body.roomId].game.playerHands.map(hand => hand.length),
-          myCards: rooms[req.body.roomId].game.playerHands[i]
+          lastPlay: rooms[socket.roomId].game.lastPlay,
+          finished: rooms[socket.roomId].game.finished,
+          playerHands: rooms[socket.roomId].game.playerHands.map(hand => hand.length),
+          myCards: rooms[socket.roomId].game.playerHands[i]
         });
       }
     });
     cb && cb({success: true});
 
     // 게임 종료 체크
-    const finishedCount = rooms[req.body.roomId].game.finished.filter(f => f).length;
-    console.log(`게임 진행 상황: ${finishedCount}/${rooms[req.body.roomId].players.length} 완주`);
+    const finishedCount = rooms[socket.roomId].game.finished.filter(f => f).length;
+    console.log(`게임 진행 상황: ${finishedCount}/${rooms[socket.roomId].players.length} 완주`);
     
-    if (finishedCount >= rooms[req.body.roomId].players.length - 1) { // 한 명만 남으면 게임 종료
+    if (finishedCount >= rooms[socket.roomId].players.length - 1) { // 한 명만 남으면 게임 종료
       // 남은 한 명 자동 꼴찌 처리
-      const lastIdx = rooms[req.body.roomId].game.finished.findIndex(f => !f);
+      const lastIdx = rooms[socket.roomId].game.finished.findIndex(f => !f);
       if (lastIdx !== -1) {
-        rooms[req.body.roomId].game.finished[lastIdx] = true;
-        rooms[req.body.roomId].game.finishOrder.push(lastIdx);
+        rooms[socket.roomId].game.finished[lastIdx] = true;
+        rooms[socket.roomId].game.finishOrder.push(lastIdx);
       }
       console.log('모든 플레이어가 완주했습니다! 게임 종료.');
       
       // 인원에 따른 점수 배정
       let scores;
-      if (rooms[req.body.roomId].players.length === 4) {
+      if (rooms[socket.roomId].players.length === 4) {
         scores = [10, 8, 6, 4];
-      } else if (rooms[req.body.roomId].players.length === 5) {
+      } else if (rooms[socket.roomId].players.length === 5) {
         scores = [10, 8, 6, 5, 4];
-      } else if (rooms[req.body.roomId].players.length === 6) {
+      } else if (rooms[socket.roomId].players.length === 6) {
         scores = [10, 8, 6, 5, 4, 3];
-      } else if (rooms[req.body.roomId].players.length === 7) {
+      } else if (rooms[socket.roomId].players.length === 7) {
         scores = [10, 8, 6, 5, 4, 3, 2];
-      } else if (rooms[req.body.roomId].players.length === 8) {
+      } else if (rooms[socket.roomId].players.length === 8) {
         scores = [10, 8, 6, 5, 4, 3, 2, 1];
       }
-      const result = rooms[req.body.roomId].game.finishOrder.map((playerIdx, i) => {
-        const nickname = rooms[req.body.roomId].game.ordered[playerIdx].nickname;
-        const role = rooms[req.body.roomId].game.ordered[playerIdx].role;
+      const result = rooms[socket.roomId].game.finishOrder.map((playerIdx, i) => {
+        const nickname = rooms[socket.roomId].game.ordered[playerIdx].nickname;
+        const role = rooms[socket.roomId].game.ordered[playerIdx].role;
         const score = scores[i] || 0;
-        rooms[req.body.roomId].game.lastGameScores[nickname] = score;
-        rooms[req.body.roomId].game.totalScores[nickname] = (rooms[req.body.roomId].game.totalScores[nickname] || 0) + score;
+        rooms[socket.roomId].game.lastGameScores[nickname] = score;
+        rooms[socket.roomId].game.totalScores[nickname] = (rooms[socket.roomId].game.totalScores[nickname] || 0) + score;
         return {
           nickname,
           role,
           score,
-          total: rooms[req.body.roomId].game.totalScores[nickname]
+          total: rooms[socket.roomId].game.totalScores[nickname]
         }
       });
       
       console.log('게임 종료! 최종 결과:', result);
-      io.to(req.body.roomId).emit('gameEnd', result);
+      io.to(socket.roomId).emit('gameEnd', result);
       
       // 5초 후 자동으로 다음 게임 시작
       setTimeout(() => {
         // 게임 상태만 리셋 (점수, totalScores 등은 유지)
-        rooms[req.body.roomId].game.inProgress = false;
-        rooms[req.body.roomId].game.ordered = [];
-        rooms[req.body.roomId].game.turnIdx = 0;
-        rooms[req.body.roomId].game.lastPlay = null;
-        rooms[req.body.roomId].game.passes = 0;
-        rooms[req.body.roomId].game.playerHands = [];
-        rooms[req.body.roomId].game.finished = [];
-        rooms[req.body.roomId].game.finishOrder = [];
-        rooms[req.body.roomId].game.gameCount = (rooms[req.body.roomId].game.gameCount || 1) + 1; // 게임 횟수 증가
+        rooms[socket.roomId].game.inProgress = false;
+        rooms[socket.roomId].game.ordered = [];
+        rooms[socket.roomId].game.turnIdx = 0;
+        rooms[socket.roomId].game.lastPlay = null;
+        rooms[socket.roomId].game.passes = 0;
+        rooms[socket.roomId].game.playerHands = [];
+        rooms[socket.roomId].game.finished = [];
+        rooms[socket.roomId].game.finishOrder = [];
+        rooms[socket.roomId].game.gameCount = (rooms[socket.roomId].game.gameCount || 1) + 1; // 게임 횟수 증가
         // lastGameScores, totalScores는 유지
 
         startGameIfReady();
@@ -838,10 +838,10 @@ io.on('connection', (socket) => {
     
     // 다음 턴
     do {
-      rooms[req.body.roomId].game.turnIdx = (rooms[req.body.roomId].game.turnIdx + 1) % rooms[req.body.roomId].game.ordered.length;
-    } while (rooms[req.body.roomId].game.finished[rooms[req.body.roomId].game.turnIdx]);
+      rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
+    } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]);
     
-    io.to(req.body.roomId).emit('turnChanged', { turnIdx: rooms[req.body.roomId].game.turnIdx, currentPlayer: rooms[req.body.roomId].game.ordered[rooms[req.body.roomId].game.turnIdx], isFirstTurnOfRound: false });
+    io.to(socket.roomId).emit('turnChanged', { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: false });
     startTurnTimer();
   });
   
@@ -852,41 +852,41 @@ io.on('connection', (socket) => {
     if (!room.game.inProgress || idx !== room.game.turnIdx || room.game.finished[idx]) return;
     
     // 새로운 라운드의 첫 턴에는 패스할 수 없음
-    if (rooms[req.body.roomId].game.isFirstTurnOfRound) {
-      console.log(`\n--- [passTurn] ${rooms[req.body.roomId].game.ordered[idx].nickname}이 첫 턴에 패스 시도 - 거부됨 ---`);
+    if (rooms[socket.roomId].game.isFirstTurnOfRound) {
+      console.log(`\n--- [passTurn] ${rooms[socket.roomId].game.ordered[idx].nickname}이 첫 턴에 패스 시도 - 거부됨 ---`);
       return cb && cb({success: false, message: '새로운 라운드의 첫 턴에는 패스할 수 없습니다. 카드를 내주세요.'});
     }
     
     clearTurnTimer();
-    rooms[req.body.roomId].game.passes++;
-    io.to(req.body.roomId).emit('passResult', {playerIdx: idx, passes: rooms[req.body.roomId].game.passes});
+    rooms[socket.roomId].game.passes++;
+    io.to(socket.roomId).emit('passResult', {playerIdx: idx, passes: rooms[socket.roomId].game.passes});
 
-    console.log(`\n--- [passTurn] Event from ${rooms[req.body.roomId].game.ordered[idx].nickname} (idx: ${idx}) ---`);
-    console.log(`Current passes: ${rooms[req.body.roomId].game.passes}`);
+    console.log(`\n--- [passTurn] Event from ${rooms[socket.roomId].game.ordered[idx].nickname} (idx: ${idx}) ---`);
+    console.log(`Current passes: ${rooms[socket.roomId].game.passes}`);
     
     // 현재 게임에 참여 중인(완주하지 않은) 플레이어 수 계산
-    const activePlayersCount = rooms[req.body.roomId].players.length - rooms[req.body.roomId].game.finished.filter(f => f).length;
+    const activePlayersCount = rooms[socket.roomId].players.length - rooms[socket.roomId].game.finished.filter(f => f).length;
     console.log(`Active players: ${activePlayersCount}`);
 
     // 모두 패스 -> 라운드 리셋
     // 플레이어가 1명만 남은 경우는 패스하지 않고 카드를 내야 함
-    if (rooms[req.body.roomId].game.passes >= activePlayersCount-1 && activePlayersCount > 1) {
+    if (rooms[socket.roomId].game.passes >= activePlayersCount-1 && activePlayersCount > 1) {
       console.log('*** All active players have passed. Starting a new round. ***');
-      rooms[req.body.roomId].game.passes = 0;
+      rooms[socket.roomId].game.passes = 0;
       // 마지막으로 카드를 낸 사람이 턴을 잡음
-      if (rooms[req.body.roomId].game.lastPlay) {
-        rooms[req.body.roomId].game.turnIdx = rooms[req.body.roomId].game.lastPlay.playerIdx;
+      if (rooms[socket.roomId].game.lastPlay) {
+        rooms[socket.roomId].game.turnIdx = rooms[socket.roomId].game.lastPlay.playerIdx;
         // 마지막으로 카드를 낸 사람이 이미 완료했다면, 다음 완료하지 않은 플레이어에게 턴을 넘김
-        if (rooms[req.body.roomId].game.finished[rooms[req.body.roomId].game.turnIdx]) {
+        if (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]) {
           do {
-            rooms[req.body.roomId].game.turnIdx = (rooms[req.body.roomId].game.turnIdx + 1) % rooms[req.body.roomId].game.ordered.length;
-          } while (rooms[req.body.roomId].game.finished[rooms[req.body.roomId].game.turnIdx]);
+            rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
+          } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]);
         }
       }
       // lastPlay가 null이면 (라운드 첫 턴에 모두 패스하는 비정상적 상황) 현재 턴 유지
-      rooms[req.body.roomId].game.lastPlay = null;
-      rooms[req.body.roomId].game.isFirstTurnOfRound = true; // 새로운 라운드 시작 시 첫 턴 플래그 설정
-      io.to(req.body.roomId).emit('newRound', {turnIdx: rooms[req.body.roomId].game.turnIdx, lastPlay: null, currentPlayer: rooms[req.body.roomId].game.ordered[rooms[req.body.roomId].game.turnIdx], isFirstTurnOfRound: true});
+      rooms[socket.roomId].game.lastPlay = null;
+      rooms[socket.roomId].game.isFirstTurnOfRound = true; // 새로운 라운드 시작 시 첫 턴 플래그 설정
+      io.to(socket.roomId).emit('newRound', {turnIdx: rooms[socket.roomId].game.turnIdx, lastPlay: null, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: true});
       startTurnTimer();
     } else if (activePlayersCount === 1) {
       // 플레이어가 1명만 남은 경우, 패스할 수 없고 카드를 내야 함
@@ -894,9 +894,9 @@ io.on('connection', (socket) => {
       // 패스 처리는 하지 않고 턴을 그대로 유지
     } else {
       do {
-        rooms[req.body.roomId].game.turnIdx = (rooms[req.body.roomId].game.turnIdx + 1) % rooms[req.body.roomId].game.ordered.length;
-      } while (rooms[req.body.roomId].game.finished[rooms[req.body.roomId].game.turnIdx]);
-      io.to(req.body.roomId).emit('turnChanged', { turnIdx: rooms[req.body.roomId].game.turnIdx, currentPlayer: rooms[req.body.roomId].game.ordered[rooms[req.body.roomId].game.turnIdx], isFirstTurnOfRound: false });
+        rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
+      } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]);
+      io.to(socket.roomId).emit('turnChanged', { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: false });
       startTurnTimer();
     }
     
@@ -916,9 +916,9 @@ io.on('connection', (socket) => {
     
     console.log(`요청한 플레이어 인덱스: ${idx}`);
     console.log(`달무티 인덱스: ${dalmutiIdx}`);
-    console.log(`카드 교환 진행 중: ${rooms[req.body.roomId].game.cardExchangeInProgress}`);
+    console.log(`카드 교환 진행 중: ${rooms[socket.roomId].game.cardExchangeInProgress}`);
     
-    if (!rooms[req.body.roomId].game.cardExchangeInProgress || idx !== dalmutiIdx) {
+    if (!rooms[socket.roomId].game.cardExchangeInProgress || idx !== dalmutiIdx) {
       console.log('카드 교환 조건 불충족 - 이벤트 무시');
       return cb && cb({success: false, message: '카드 교환 단계가 아니거나 달무티가 아닙니다.'});
     }
@@ -929,7 +929,7 @@ io.on('connection', (socket) => {
     }
     
     // 선택된 카드가 손패에 있는지 확인
-    const hand = [...rooms[req.body.roomId].game.playerHands[idx]];
+    const hand = [...rooms[socket.roomId].game.playerHands[idx]];
     console.log(`달무티 손패: [${hand.join(',')}]`);
     
     for (const card of selectedCards) {
@@ -942,38 +942,38 @@ io.on('connection', (socket) => {
     }
     
     // 농노에게 카드 전달
-    const slaveIdx = rooms[req.body.roomId].game.ordered.findIndex(p => p.role === '노예');
+    const slaveIdx = rooms[socket.roomId].game.ordered.findIndex(p => p.role === '노예');
     console.log(`농노 인덱스: ${slaveIdx}`);
     
     selectedCards.forEach(card => {
-      const cardIndex = rooms[req.body.roomId].game.playerHands[idx].indexOf(card);
+      const cardIndex = rooms[socket.roomId].game.playerHands[idx].indexOf(card);
       if (cardIndex > -1) {
-        rooms[req.body.roomId].game.playerHands[idx].splice(cardIndex, 1);
-        rooms[req.body.roomId].game.playerHands[slaveIdx].push(card);
+        rooms[socket.roomId].game.playerHands[idx].splice(cardIndex, 1);
+        rooms[socket.roomId].game.playerHands[slaveIdx].push(card);
       }
     });
     
     // 카드 교환 후 손패 정렬
-    rooms[req.body.roomId].game.playerHands.forEach(hand => hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b)));
-    console.log(`달무티(${rooms[req.body.roomId].game.ordered[idx].nickname})가 농노에게 카드 전달: [${selectedCards.join(',')}]`);
-    console.log(`달무티 최종 손패: [${rooms[req.body.roomId].game.playerHands[idx].join(',')}]`);
-    console.log(`농노 최종 손패: [${rooms[req.body.roomId].game.playerHands[slaveIdx].join(',')}]`);
+    rooms[socket.roomId].game.playerHands.forEach(hand => hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b)));
+    console.log(`달무티(${rooms[socket.roomId].game.ordered[idx].nickname})가 농노에게 카드 전달: [${selectedCards.join(',')}]`);
+    console.log(`달무티 최종 손패: [${rooms[socket.roomId].game.playerHands[idx].join(',')}]`);
+    console.log(`농노 최종 손패: [${rooms[socket.roomId].game.playerHands[slaveIdx].join(',')}]`);
     
     // 카드 교환 완료 알림
-    io.to(req.body.roomId).emit('cardExchange', {
-      slave: { nickname: rooms[req.body.roomId].game.ordered[slaveIdx].nickname, cards: rooms[req.body.roomId].game.slaveCardsGiven },
-      dalmuti: { nickname: rooms[req.body.roomId].game.ordered[idx].nickname, cards: selectedCards }
+    io.to(socket.roomId).emit('cardExchange', {
+      slave: { nickname: rooms[socket.roomId].game.ordered[slaveIdx].nickname, cards: rooms[socket.roomId].game.slaveCardsGiven },
+      dalmuti: { nickname: rooms[socket.roomId].game.ordered[idx].nickname, cards: selectedCards }
     });
     
     // 달무티 카드 선택 완료 상태 업데이트
-    rooms[req.body.roomId].game.dalmutiCardSelected = true;
+    rooms[socket.roomId].game.dalmutiCardSelected = true;
     
     // 게임 시작 준비 완료
     cb && cb({success: true});
     
     // 대주교도 카드 선택을 완료했는지 확인
-    const archbishopIdx = rooms[req.body.roomId].game.ordered.findIndex(p => p.role === '대주교');
-    if (archbishopIdx === -1 || rooms[req.body.roomId].game.archbishopCardSelected) {
+    const archbishopIdx = rooms[socket.roomId].game.ordered.findIndex(p => p.role === '대주교');
+    if (archbishopIdx === -1 || rooms[socket.roomId].game.archbishopCardSelected) {
       // 대주교가 없거나 이미 카드 선택을 완료한 경우 게임 시작
       console.log('달무티 카드 선택 완료! 게임 시작 함수 호출');
       startGameAfterCardExchange();
@@ -995,9 +995,9 @@ io.on('connection', (socket) => {
     
     console.log(`요청한 플레이어 인덱스: ${idx}`);
     console.log(`대주교 인덱스: ${archbishopIdx}`);
-    console.log(`카드 교환 진행 중: ${rooms[req.body.roomId].game.cardExchangeInProgress}`);
+    console.log(`카드 교환 진행 중: ${rooms[socket.roomId].game.cardExchangeInProgress}`);
     
-    if (!rooms[req.body.roomId].game.cardExchangeInProgress || idx !== archbishopIdx) {
+    if (!rooms[socket.roomId].game.cardExchangeInProgress || idx !== archbishopIdx) {
       console.log('카드 교환 조건 불충족 - 이벤트 무시');
       return cb && cb({success: false, message: '카드 교환 단계가 아니거나 대주교가 아닙니다.'});
     }
@@ -1008,7 +1008,7 @@ io.on('connection', (socket) => {
     }
     
     // 선택된 카드가 손패에 있는지 확인
-    const hand = [...rooms[req.body.roomId].game.playerHands[idx]];
+    const hand = [...rooms[socket.roomId].game.playerHands[idx]];
     console.log(`대주교 손패: [${hand.join(',')}]`);
     
     for (const card of selectedCards) {
@@ -1021,38 +1021,38 @@ io.on('connection', (socket) => {
     }
     
     // 광부에게 카드 전달
-    const minerIdx = rooms[req.body.roomId].game.ordered.findIndex(p => p.role === '광부');
+    const minerIdx = rooms[socket.roomId].game.ordered.findIndex(p => p.role === '광부');
     console.log(`광부 인덱스: ${minerIdx}`);
     
     selectedCards.forEach(card => {
-      const cardIndex = rooms[req.body.roomId].game.playerHands[idx].indexOf(card);
+      const cardIndex = rooms[socket.roomId].game.playerHands[idx].indexOf(card);
       if (cardIndex > -1) {
-        rooms[req.body.roomId].game.playerHands[idx].splice(cardIndex, 1);
-        rooms[req.body.roomId].game.playerHands[minerIdx].push(card);
+        rooms[socket.roomId].game.playerHands[idx].splice(cardIndex, 1);
+        rooms[socket.roomId].game.playerHands[minerIdx].push(card);
       }
     });
     
     // 카드 교환 후 손패 정렬
-    rooms[req.body.roomId].game.playerHands.forEach(hand => hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b)));
-    console.log(`대주교(${rooms[req.body.roomId].game.ordered[idx].nickname})가 광부에게 카드 전달: [${selectedCards.join(',')}]`);
-    console.log(`대주교 최종 손패: [${rooms[req.body.roomId].game.playerHands[idx].join(',')}]`);
-    console.log(`광부 최종 손패: [${rooms[req.body.roomId].game.playerHands[minerIdx].join(',')}]`);
+    rooms[socket.roomId].game.playerHands.forEach(hand => hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b)));
+    console.log(`대주교(${rooms[socket.roomId].game.ordered[idx].nickname})가 광부에게 카드 전달: [${selectedCards.join(',')}]`);
+    console.log(`대주교 최종 손패: [${rooms[socket.roomId].game.playerHands[idx].join(',')}]`);
+    console.log(`광부 최종 손패: [${rooms[socket.roomId].game.playerHands[minerIdx].join(',')}]`);
     
     // 카드 교환 완료 알림 (대주교-광부)
-    io.to(req.body.roomId).emit('cardExchange', {
-      miner: { nickname: rooms[req.body.roomId].game.ordered[minerIdx].nickname, cards: rooms[req.body.roomId].game.minerCardsGiven },
-      archbishop: { nickname: rooms[req.body.roomId].game.ordered[idx].nickname, cards: selectedCards }
+    io.to(socket.roomId).emit('cardExchange', {
+      miner: { nickname: rooms[socket.roomId].game.ordered[minerIdx].nickname, cards: rooms[socket.roomId].game.minerCardsGiven },
+      archbishop: { nickname: rooms[socket.roomId].game.ordered[idx].nickname, cards: selectedCards }
     });
     
     // 대주교 카드 선택 완료 상태 업데이트
-    rooms[req.body.roomId].game.archbishopCardSelected = true;
+    rooms[socket.roomId].game.archbishopCardSelected = true;
     
     // 게임 시작 준비 완료
     cb && cb({success: true});
     
     // 달무티도 카드 선택을 완료했는지 확인
-    const dalmutiIdx = rooms[req.body.roomId].game.ordered.findIndex(p => p.role === '달무티');
-    if (dalmutiIdx === -1 || rooms[req.body.roomId].game.dalmutiCardSelected) {
+    const dalmutiIdx = rooms[socket.roomId].game.ordered.findIndex(p => p.role === '달무티');
+    if (dalmutiIdx === -1 || rooms[socket.roomId].game.dalmutiCardSelected) {
       // 달무티가 없거나 이미 카드 선택을 완료한 경우 게임 시작
       console.log('대주교 카드 선택 완료! 게임 시작 함수 호출');
       startGameAfterCardExchange();
