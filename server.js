@@ -38,6 +38,12 @@ let game = {
 };
 // ------------------------------------
 
+// 요청 로깅 미들웨어 추가
+app.use((req, res, next) => {
+  console.log(`요청: ${req.method} ${req.url}`);
+  next();
+});
+
 app.use(express.static(__dirname));
 
 // 메인 진입 시 index.html로 리다이렉트
