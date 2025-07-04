@@ -436,6 +436,10 @@ function startTurnTimer(roomId) {
   if (!room || !room.game) return;
   if (!room.timerEnabled) return; // 타이머 꺼져있으면 동작 안 함
   if (room.turnTimer) clearTimeout(room.turnTimer);
+  // turnEndTime을 계산해서 모든 유저에게 broadcast
+  const endTime = Date.now() + 30000;
+  room.turnEndTime = endTime;
+  io.to(roomId).emit('turnTimerStart', { endTime });
   room.turnTimer = setTimeout(() => {
     const currentPlayer = room.game.ordered[room.game.turnIdx];
     if (!room.game.finished[room.game.turnIdx]) {

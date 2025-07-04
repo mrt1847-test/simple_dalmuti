@@ -264,31 +264,35 @@
       console.log('roleAssigned:', ordered);
 
       let turnCountdown = null;
-      let turnTimeLeft = 30;
+      let turnEndTime = null;
       let timerEnabled = true; // 서버에서 타이머 상태를 받으면 갱신됨
 
       function startTurnCountdown() {
-        if (!timerEnabled) {
+        if (!timerEnabled || !turnEndTime) {
           stopTurnCountdown();
           updateTurnTimerUI();
           return;
         }
         clearInterval(turnCountdown);
-        turnTimeLeft = 30;
         updateTurnTimerUI();
         turnCountdown = setInterval(() => {
-          turnTimeLeft--;
           updateTurnTimerUI();
-          if (turnTimeLeft <= 0) {
+          if (getTurnTimeLeft() <= 0) {
             clearInterval(turnCountdown);
           }
         }, 1000);
       }
 
+      function getTurnTimeLeft() {
+        if (!turnEndTime) return 0;
+        return Math.max(0, Math.floor((turnEndTime - Date.now()) / 1000));
+      }
+
       function updateTurnTimerUI() {
         const timerDiv = document.getElementById('turnTimer');
-        if (timerDiv && timerEnabled && turnInfo && turnInfo.currentPlayer) {
-          timerDiv.textContent = `⏰ 남은 시간: ${turnTimeLeft}초`;
+        if (timerDiv && timerEnabled && turnInfo && turnInfo.currentPlayer && turnEndTime) {
+          const left = getTurnTimeLeft();
+          timerDiv.textContent = `⏰ 남은 시간: ${left}초`;
         } else if (timerDiv) {
           timerDiv.textContent = '';
         }
@@ -487,22 +491,18 @@
 
       // --- 턴 타이머 UI 동기화 ---
       function syncTurnTimer() {
-        if (!timerEnabled) {
+        if (!timerEnabled || !turnEndTime) {
           stopTurnCountdown();
           updateTurnTimerUI();
           return;
         }
-        if (turnInfo && turnInfo.currentPlayer && turnInfo.currentPlayer.id === socket.id) {
-          startTurnCountdown();
-        } else {
-          stopTurnCountdown();
-        }
+        startTurnCountdown();
       }
 
       socket.on('turnChanged', (data) => {
         turnInfo = data;
         renderGame();
-        syncTurnTimer();
+        // turnTimerStart 이벤트에서 타이머가 시작됨
       });
       socket.on('newRound', (data) => {
         turnInfo = data;
@@ -513,7 +513,7 @@
           appendChat('🎯 새로운 라운드의 첫 턴입니다! 패스할 수 없으니 카드를 내주세요.', false, true);
         }
         renderGame();
-        syncTurnTimer();
+        // turnTimerStart 이벤트에서 타이머가 시작됨
       });
       socket.on('playResult', (data) => {
         console.log('카드 제출 결과:', data);
@@ -549,6 +549,8 @@
       socket.on('turnTimeout', () => {
         appendChat('⏰ 제한시간이 초과되어 자동으로 패스 처리되었습니다.', false, true);
         stopTurnCountdown();
+        turnEndTime = null;
+        updateTurnTimerUI();
       });
 
       // 게임 초기 설정 이벤트 핸들러
@@ -1043,6 +1045,11 @@
         // body 스크롤 다시 허용
         document.body.style.overflow = '';
       };
+
+      socket.on('turnTimerStart', (data) => {
+        turnEndTime = data.endTime;
+        startTurnCountdown();
+      });
     });
   </script>
 </body>
