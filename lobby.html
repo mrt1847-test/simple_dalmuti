@@ -142,8 +142,12 @@
     if (!nickname) window.location.href = '/index.html';
 
     socket.emit('join', nickname, (res) => {
-      if (!res.success && res.message !== '중복 닉네임') {
-        alert(res.message);
+      if (!res.success) {
+        if (res.message === '중복 닉네임') {
+          alert('중복 닉네임입니다. 다른 닉네임을 입력하세요.');
+        } else {
+          alert(res.message);
+        }
         window.location.href = '/index.html';
       }
     });

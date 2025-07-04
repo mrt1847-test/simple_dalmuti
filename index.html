@@ -47,7 +47,11 @@
             localStorage.setItem('dalmuti_nickname', nickname);
             window.location.href = '/lobby.html';
           } else {
-            alert(res.message);
+            if(res.message === '중복 닉네임') {
+              alert('중복 닉네임입니다. 다른 닉네임을 입력하세요.');
+            } else {
+              alert(res.message);
+            }
           }
         });
       }
