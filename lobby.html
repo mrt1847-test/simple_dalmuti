@@ -137,18 +137,29 @@
   </div>
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    const socket = io("https://simple-dalmuti.onrender.com");
-    const nickname = localStorage.getItem('dalmuti_nickname');
-    if (!nickname) window.location.href = '/index.html';
+    // 쿼리스트링에서 roomId, nickname 추출
+    function getQueryParam(name) {
+      const url = new URL(window.location.href);
+      return url.searchParams.get(name);
+    }
+    const roomId = getQueryParam('roomId');
+    const nickname = getQueryParam('nickname');
+    if (!roomId || !nickname) {
+      alert('잘못된 접근입니다.');
+      window.location.href = '/room-list.html';
+    }
 
-    socket.emit('join', nickname, (res) => {
+    const socket = io(); // 같은 origin
+
+    // 방 입장
+    socket.emit('join', { roomId, nickname }, (res) => {
       if (!res.success) {
         if (res.message === '중복 닉네임') {
           alert('중복 닉네임입니다. 다른 닉네임을 입력하세요.');
         } else {
           alert(res.message);
         }
-        window.location.href = '/index.html';
+        window.location.href = '/room-list.html';
       }
     });
 
@@ -230,7 +241,7 @@
       if (confirm('로비를 나가시겠습니까?')) {
         localStorage.clear();
         sessionStorage.clear();
-        window.location.href = '/index.html';
+        window.location.href = '/room-list.html';
       }
     };
   </script>

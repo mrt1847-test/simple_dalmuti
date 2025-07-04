@@ -230,22 +230,26 @@
   <script>
     console.log('game.html loaded');
     document.addEventListener('DOMContentLoaded', function() {
-      const nickname = localStorage.getItem('dalmuti_nickname');
-      if (!nickname) window.location.href = '/index.html';
-
-      const socket = io("https://simple-dalmuti.onrender.com");
+      // 쿼리스트링에서 roomId, nickname 추출
+      function getQueryParam(name) {
+        const url = new URL(window.location.href);
+        return url.searchParams.get(name);
+      }
+      const roomId = getQueryParam('roomId');
+      const nickname = getQueryParam('nickname');
+      if (!roomId || !nickname) {
+        alert('잘못된 접근입니다.');
+        window.location.href = '/room-list.html';
+        return;
+      }
+      const socket = io();
       socket.on('connect', () => {
         console.log('socket connected! id:', socket.id);
       });
-      socket.on('roleAssigned', (ordered) => {
-        console.log('roleAssigned:', ordered, '내 소켓 id:', socket.id);
-      });
-
-      // ★ 서버에 닉네임을 알림
-      socket.emit('join', nickname, (res) => {
+      socket.emit('join', { roomId, nickname }, (res) => {
         if (!res.success && res.message !== '중복 닉네임') {
           alert(res.message);
-          window.location.href = '/index.html';
+          window.location.href = '/room-list.html';
         }
       });
 

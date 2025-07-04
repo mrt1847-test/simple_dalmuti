@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>달무티 방 목록</title>
+  <style>
+    body { font-family: sans-serif; background: #f8f8f8; margin: 0; padding: 0; }
+    .container { max-width: 500px; margin: 40px auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #0001; padding: 32px; }
+    h1 { text-align: center; }
+    .room-list { margin: 24px 0; }
+    .room { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee; }
+    .room:last-child { border-bottom: none; }
+    .room-name { font-weight: bold; }
+    .room-players { color: #888; }
+    .join-btn { background: #4caf50; color: #fff; border: none; border-radius: 4px; padding: 6px 16px; cursor: pointer; }
+    .join-btn:disabled { background: #aaa; }
+    .create-room { display: flex; gap: 8px; margin-top: 24px; }
+    .create-room input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+    .create-room button { padding: 8px 16px; border: none; border-radius: 4px; background: #2196f3; color: #fff; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>달무티 방 목록</h1>
+    <div class="room-list" id="roomList"></div>
+    <form class="create-room" id="createRoomForm">
+      <input type="text" id="roomName" placeholder="방 이름 입력" maxlength="20" required>
+      <button type="submit">방 만들기</button>
+    </form>
+  </div>
+  <script>
+    async function fetchRooms() {
+      const res = await fetch('/api/rooms');
+      const rooms = await res.json();
+      const list = document.getElementById('roomList');
+      list.innerHTML = rooms.length ? '' : '<div style="text-align:center;color:#888;">방이 없습니다.</div>';
+      rooms.forEach(room => {
+        const div = document.createElement('div');
+        div.className = 'room';
+        div.innerHTML = `
+          <span class="room-name">${room.name}</span>
+          <span class="room-players">(${room.playerCount}명)</span>
+          <button class="join-btn" onclick="joinRoom('${room.id}')">입장</button>
+        `;
+        list.appendChild(div);
+      });
+    }
+    async function joinRoom(roomId) {
+      // 닉네임 입력 후 lobby.html로 이동 (roomId 쿼리)
+      const nickname = prompt('닉네임을 입력하세요 (중복 불가)');
+      if (!nickname) return;
+      // 중복 닉네임 체크는 lobby.html에서 처리
+      location.href = `lobby.html?roomId=${encodeURIComponent(roomId)}&nickname=${encodeURIComponent(nickname)}`;
+    }
+    document.getElementById('createRoomForm').onsubmit = async e => {
+      e.preventDefault();
+      const roomName = document.getElementById('roomName').value.trim();
+      if (!roomName) return;
+      const res = await fetch('/api/create-room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomName })
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchRooms();
+        document.getElementById('roomName').value = '';
+      } else {
+        alert('방 생성 실패: ' + (data.message || '알 수 없는 오류'));
+      }
+    };
+    fetchRooms();
+    setInterval(fetchRooms, 3000);
+  </script>
+</body>
+</html> 
