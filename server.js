@@ -25,7 +25,8 @@ function createRoom(roomId, roomName) {
     name: roomName,
     players: [],
     game: null, // 기존 game 구조를 여기에 넣음
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    timerEnabled: true // 타이머 ON이 기본값
   };
 }
 
@@ -639,6 +640,19 @@ io.on('connection', (socket) => {
     const room = rooms[socket.roomId];
     if (!room) return;
     const senderNickname = socket.nickname || 'Unknown';
+
+    // 타이머 명령어 처리 복원
+    if (msg === '!타이머on') {
+      room.timerEnabled = true;
+      io.to(socket.roomId).emit('chat', {nickname: 'SYSTEM', msg: '타이머가 켜졌습니다.'});
+      return;
+    }
+    if (msg === '!타이머off') {
+      room.timerEnabled = false;
+      io.to(socket.roomId).emit('chat', {nickname: 'SYSTEM', msg: '타이머가 꺼졌습니다.'});
+      return;
+    }
+
     io.to(socket.roomId).emit('chat', {nickname: senderNickname, msg});
   });
 
