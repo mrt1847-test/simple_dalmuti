@@ -199,7 +199,7 @@
       }
     });
     socket.on('gameStart', () => {
-      window.location.href = '/game.html';
+      window.location.href = `/game.html?roomId=${encodeURIComponent(roomId)}&nickname=${encodeURIComponent(nickname)}`;
     });
     // 채팅 기능 (game.html과 동일하게)
     const chatMessages = document.getElementById('chatMessages');
