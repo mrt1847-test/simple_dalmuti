@@ -904,6 +904,26 @@
         syncTurnTimer();
       });
 
+      // 게임 중단
+      socket.on('gameInterrupted', (data) => {
+        console.log('게임 중단:', data);
+
+        const gameContent = document.getElementById('gameContent');
+        if (!gameContent) return;
+
+        let html = '<h1 style="text-align:center;color:#f44336;">⚠️ 게임 중단</h1>';
+        html += '<div style="text-align:center;margin-bottom:2em;">';
+        html += '<h2>게임이 중단되었습니다</h2>';
+        html += `<p style="color:#666;font-size:1.1em;">${data.message}</p>`;
+        html += '<p style="color:#888;">플레이어가 부족하여 게임을 계속할 수 없습니다.</p>';
+        html += '<p style="color:#f57c00;font-weight:bold;margin-top:1em;">💡 아래 "게임 나가기" 버튼을 클릭하여 로비로 돌아가주세요.</p>';
+        html += '</div>';
+        gameContent.innerHTML = html;
+
+        appendChat('⚠️ 게임이 중단되었습니다. 게임 나가기 버튼을 클릭하여 로비로 돌아가주세요.', false, true);
+        stopTurnCountdown();
+      });
+
       // 게임 종료 및 점수
       socket.on('gameEnd', (result) => {
         console.log('게임 종료:', result);
