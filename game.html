@@ -343,10 +343,11 @@
             const isMyTurn = turnInfo && turnInfo.currentPlayer && turnInfo.currentPlayer.id === p.id;
             const amI = p.id === socket.id;
             let borderColor = 'transparent';
+            let backgroundColor = 'white';
             if (amI) borderColor = '#ff9800';
-            else if (isMyTurn) borderColor = '#4caf50';
+            if (isMyTurn) backgroundColor = '#e8f5e8';
 
-            html += `<div class="player-card" style="position:absolute;left:${x}px;top:${y}px;width:${playerCardWidth}px;height:${playerCardHeight}px;text-align:center;background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.08);padding:0.5em 0.2em;display:flex;flex-direction:column;justify-content:center;align-items:center;border: 3px solid ${borderColor}; transition: border-color 0.3s;">
+            html += `<div class="player-card" style="position:absolute;left:${x}px;top:${y}px;width:${playerCardWidth}px;height:${playerCardHeight}px;text-align:center;background:${backgroundColor};border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.08);padding:0.5em 0.2em;display:flex;flex-direction:column;justify-content:center;align-items:center;border: 3px solid ${borderColor}; transition: all 0.3s;">
               <div style='font-weight:bold;font-size:1.1em;'>${p.role}</div>
               <div style='margin:0.2em 0;'>${p.nickname}</div>
               <div style='font-size:0.9em;color:#666;'>카드 ${p.cardCount || 0}장</div>
