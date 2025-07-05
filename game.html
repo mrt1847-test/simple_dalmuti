@@ -1127,13 +1127,18 @@
 
 
       // 게임 시작 알림 (모든 라운드)
-      socket.on('gameStart', () => {
+      socket.on('gameStart', (data) => {
         // 만약 현재 페이지가 game.html이 아니면 이동
         if (!window.location.pathname.endsWith('game.html')) {
           // roomId, nickname 쿼리스트링 유지
           const params = new URLSearchParams(window.location.search);
           window.location.href = '/game.html?' + params.toString();
         } else {
+          // 혁명 선택이나 카드 교환이 필요한 경우 게임 화면을 렌더링하지 않음
+          if (data && (data.needRevolutionChoice || data.needCardExchange)) {
+            console.log('혁명 선택 또는 카드 교환이 필요하므로 게임 화면 렌더링을 건너뜁니다.');
+            return;
+          }
           // 이미 game.html이면 새로고침 또는 render
           renderGame();
         }

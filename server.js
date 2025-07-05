@@ -251,9 +251,10 @@ function startGameIfReady(roomId) {
     console.log(`혁명 기회 체크 - 조커 2장 보유자 인덱스: ${joker2Idx}`);
     if (joker2Idx !== -1) {
       console.log('🎯 혁명 기회 발견! 조커 2장 보유자:', rooms[roomId].game.ordered[joker2Idx].nickname);
-      // 먼저 클라이언트들에게 게임 페이지로 이동하라고 알림
-      io.to(roomId).emit('gameStart');
-      console.log('혁명 기회! gameStart 이벤트 전송. 클라이언트들이 game.html로 이동합니다.');
+      // 혁명 선택이 필요한 경우 gameStart 이벤트를 보내지 않음
+      // 클라이언트들에게 게임 페이지로 이동하라고 알림 (혁명 선택용)
+      io.to(roomId).emit('gameStart', { needRevolutionChoice: true });
+      console.log('혁명 기회! gameStart 이벤트 전송 (혁명 선택용). 클라이언트들이 game.html로 이동합니다.');
       
       // 5초 후에 혁명 선택 요청 (클라이언트들이 game.html로 이동할 시간을 더 줌)
       setTimeout(() => {
@@ -1354,7 +1355,8 @@ io.on('connection', (socket) => {
       if (rooms[roomId].game.cardExchangeInProgress) {
         rooms[roomId].game.dalmutiCardSelected = false;
         rooms[roomId].game.archbishopCardSelected = false;
-        io.to(roomId).emit('gameStart');
+        // 카드 교환 단계 시작을 위한 gameStart 이벤트 (혁명 선택이 아님)
+        io.to(roomId).emit('gameStart', { needCardExchange: true });
         setTimeout(() => {
           const dalmutiIdx = rooms[roomId].game.ordered.findIndex(p => p.role === '달무티');
           const archbishopIdx = rooms[roomId].game.ordered.findIndex(p => p.role === '대주교');
