@@ -869,7 +869,21 @@ io.on('connection', (socket) => {
       }
       
       if (justFinished) {
-        // 완주한 경우: 다음 미완주자에게 턴 넘기기
+        // 완주한 경우: playResult를 한 번 더 보내서 클라가 완주자임을 인지하게 함
+        rooms[socket.roomId].game.ordered.forEach((p, i) => {
+          const targetSocket = io.sockets.sockets.get(p.id);
+          if (targetSocket) {
+            targetSocket.emit('playResult', {
+              playerIdx: idx,
+              cards,
+              lastPlay: {count: cards.length, number: num, playerIdx: idx, cards: [...cards]},
+              finished: rooms[socket.roomId].game.finished,
+              playerHands: rooms[socket.roomId].game.playerHands.map(hand => hand.length),
+              myCards: rooms[socket.roomId].game.playerHands[i]
+            });
+          }
+        });
+        // 그 다음 미완주자에게 턴 넘기기
         do {
           rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
         } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]);
