@@ -431,9 +431,20 @@ function startGameIfReady(roomId) {
 // 카드 교환 완료 후 게임 시작 함수
 function startGameAfterCardExchange(roomId) {
   console.log('=== startGameAfterCardExchange 함수 호출 ===');
+  console.log(`방 ID: ${roomId}`);
+  console.log(`방 존재 여부: ${!!rooms[roomId]}`);
+  console.log(`게임 존재 여부: ${!!(rooms[roomId] && rooms[roomId].game)}`);
+  
+  if (!rooms[roomId] || !rooms[roomId].game) {
+    console.error('❌ startGameAfterCardExchange: 방 또는 게임 정보가 없습니다.');
+    return;
+  }
+  
   console.log('카드 교환 완료! 게임을 시작합니다.');
   console.log(`게임 진행 중: ${rooms[roomId].game.inProgress}`);
   console.log(`카드 교환 진행 중: ${rooms[roomId].game.cardExchangeInProgress}`);
+  console.log(`플레이어 수: ${rooms[roomId].game.ordered.length}`);
+  console.log(`플레이어 목록:`, rooms[roomId].game.ordered.map(p => `${p.nickname}(${p.id})`));
   
   // 카드 교환 완료 플래그 및 상태 초기화
   rooms[roomId].game.cardExchangeInProgress = false;
@@ -445,12 +456,17 @@ function startGameAfterCardExchange(roomId) {
   // 바로 게임 세팅 데이터 전송
   rooms[roomId].game.ordered.forEach((p, i) => {
     console.log(`${p.nickname}에게 gameSetup 전송 - 카드 ${rooms[roomId].game.playerHands[i].length}장`);
-    io.to(p.id).emit('gameSetup', {
-      ordered: rooms[roomId].game.ordered.map((p, i) => ({ ...p, cardCount: rooms[roomId].game.playerHands[i].length, finished: rooms[roomId].game.finished[i] })),
-      myCards: rooms[roomId].game.playerHands[i],
-      turnInfo: { turnIdx: rooms[roomId].game.turnIdx, currentPlayer: rooms[roomId].game.ordered[rooms[roomId].game.turnIdx], isFirstTurnOfRound: rooms[roomId].game.isFirstTurnOfRound },
-      field: rooms[roomId].game.lastPlay
-    });
+    try {
+      io.to(p.id).emit('gameSetup', {
+        ordered: rooms[roomId].game.ordered.map((p, i) => ({ ...p, cardCount: rooms[roomId].game.playerHands[i].length, finished: rooms[roomId].game.finished[i] })),
+        myCards: rooms[roomId].game.playerHands[i],
+        turnInfo: { turnIdx: rooms[roomId].game.turnIdx, currentPlayer: rooms[roomId].game.ordered[rooms[roomId].game.turnIdx], isFirstTurnOfRound: rooms[roomId].game.isFirstTurnOfRound },
+        field: rooms[roomId].game.lastPlay
+      });
+      console.log(`✅ ${p.nickname}에게 gameSetup 전송 완료`);
+    } catch (error) {
+      console.error(`❌ ${p.nickname}에게 gameSetup 전송 실패:`, error);
+    }
   });
   console.log('gameSetup 데이터 전송 완료.');
 }
@@ -1242,13 +1258,34 @@ io.on('connection', (socket) => {
   // 혁명 선택 결과 핸들러
   socket.on('revolutionResult', ({ revolution }) => {
     const roomId = socket.roomId;
-    if (!roomId || !rooms[roomId] || !rooms[roomId].game) return;
+    console.log('=== revolutionResult 이벤트 수신 ===');
+    console.log(`요청한 소켓 ID: ${socket.id}`);
+    console.log(`혁명 선언 여부: ${revolution}`);
+    console.log(`방 ID: ${roomId}`);
+    console.log(`방 존재 여부: ${!!rooms[roomId]}`);
+    console.log(`게임 존재 여부: ${!!(rooms[roomId] && rooms[roomId].game)}`);
+    
+    if (!roomId || !rooms[roomId] || !rooms[roomId].game) {
+      console.log('❌ revolutionResult: 방 또는 게임 정보가 없습니다.');
+      return;
+    }
+    
+    console.log(`현재 방 플레이어 수: ${rooms[roomId].players.length}`);
+    console.log(`게임 진행 중: ${rooms[roomId].game.inProgress}`);
+    console.log(`카드 교환 진행 중: ${rooms[roomId].game.cardExchangeInProgress}`);
+    
     if (revolution) {
       // 혁명 발생: 카드 교환 없이 바로 게임 시작
+      console.log('🔥 혁명 선언됨! 카드 교환 없이 게임 시작');
       io.to(roomId).emit('chat', { nickname: 'SYSTEM', msg: '혁명 발생! 카드 교환 없이 게임이 시작됩니다.' });
       // 클라이언트들이 준비될 시간을 주고 게임 시작
       setTimeout(() => {
-        startGameAfterCardExchange(roomId);
+        console.log('🚀 혁명 후 게임 시작 함수 호출');
+        try {
+          startGameAfterCardExchange(roomId);
+        } catch (error) {
+          console.error('❌ 혁명 후 게임 시작 중 오류 발생:', error);
+        }
       }, 1000);
     } else {
       // 기존 카드 교환 단계로 진행 (기존 코드 복사)
