@@ -17,6 +17,124 @@
     .create-room { display: flex; gap: 8px; margin-top: 24px; }
     .create-room input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
     .create-room button { padding: 8px 16px; border: none; border-radius: 4px; background: #2196f3; color: #fff; cursor: pointer; }
+    
+    /* 모바일 반응형 디자인 */
+    @media (max-width: 768px) {
+      .container {
+        margin: 20px auto;
+        padding: 20px;
+        max-width: 95%;
+      }
+      
+      h1 {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+      }
+      
+      .room {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 12px 0;
+      }
+      
+      .room-name {
+        font-size: 1.1rem;
+      }
+      
+      .room-players {
+        font-size: 0.9rem;
+      }
+      
+      .join-btn {
+        padding: 10px 20px;
+        font-size: 16px;
+        min-height: 44px;
+        width: 100%;
+        max-width: 200px;
+      }
+      
+      .create-room {
+        flex-direction: column;
+        gap: 12px;
+      }
+      
+      .create-room input {
+        padding: 12px;
+        font-size: 16px;
+        min-height: 44px;
+      }
+      
+      .create-room button {
+        padding: 12px 20px;
+        font-size: 16px;
+        min-height: 44px;
+      }
+      
+      /* 최대인원 선택 영역 모바일 최적화 */
+      .create-room > div {
+        display: flex;
+        align-items: center;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background: #f8f8f8;
+        padding: 0;
+        min-height: 44px;
+      }
+      
+      .create-room > div > div {
+        padding: 12px 10px 12px 12px;
+        font-size: 14px;
+        color: #888;
+        min-width: 60px;
+        background: none;
+        border: none;
+      }
+      
+      .create-room select {
+        width: 60px;
+        font-size: 16px;
+        padding: 12px 8px 12px 0;
+        border: none;
+        outline: none;
+        background: none;
+        box-sizing: border-box;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .container {
+        margin: 10px auto;
+        padding: 15px;
+        max-width: 98%;
+      }
+      
+      h1 {
+        font-size: 1.3rem;
+      }
+      
+      .room-name {
+        font-size: 1rem;
+      }
+      
+      .join-btn {
+        padding: 8px 16px;
+        font-size: 14px;
+        min-height: 40px;
+      }
+      
+      .create-room input {
+        padding: 10px;
+        font-size: 14px;
+        min-height: 40px;
+      }
+      
+      .create-room button {
+        padding: 10px 16px;
+        font-size: 14px;
+        min-height: 40px;
+      }
+    }
   </style>
 </head>
 <body>

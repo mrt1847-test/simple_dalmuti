@@ -67,7 +67,34 @@
       #lobbyArea { min-width: auto; width: 100%; max-width: 400px; }
       #chatWrap { width: 100%; max-width: 400px; margin-left: 0; margin-top: 1em; height: 300px; }
       h1 { font-size: 1.5rem; }
-      button { font-size: 1rem; }
+      button { font-size: 1rem; min-height: 44px; }
+      
+      /* 로비 나가기 버튼 모바일 최적화 */
+      #lobbyLeaveBtn {
+        padding: 10px 16px !important;
+        font-size: 16px !important;
+        min-height: 44px !important;
+        background: #e57373 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+      }
+      
+      /* 도움말 버튼 모바일 최적화 */
+      #helpBtn {
+        padding: 10px 16px !important;
+        font-size: 16px !important;
+        min-height: 44px !important;
+      }
+      
+      /* 게임 준비 버튼 모바일 최적화 */
+      #readyBtn {
+        padding: 12px 24px !important;
+        font-size: 16px !important;
+        min-height: 48px !important;
+        width: 100% !important;
+        max-width: 300px !important;
+      }
+      
       #helpModal > div {
         max-width: 95vw !important;
         width: 95vw !important;
