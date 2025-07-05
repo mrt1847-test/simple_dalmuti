@@ -804,6 +804,16 @@ io.on('connection', (socket) => {
       activeIdxs.forEach(i => {
         io.to(socket.roomId).emit('passResult', {playerIdx: i, passes: rooms[socket.roomId].game.passes + 1});
       });
+      
+      // 1을 낸 플레이어의 게임 완주 처리
+      if (hand.length === 0) {
+        if (!rooms[socket.roomId].game.finished[idx]) {
+          rooms[socket.roomId].game.finished[idx] = true;
+          rooms[socket.roomId].game.finishOrder.push(idx);
+          console.log(`*** ${rooms[socket.roomId].game.ordered[idx].nickname} has finished with 1! ***`);
+        }
+      }
+      
       // 라운드 리셋
       rooms[socket.roomId].game.passes = 0;
       rooms[socket.roomId].game.turnIdx = idx;
