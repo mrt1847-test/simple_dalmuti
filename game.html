@@ -962,6 +962,15 @@
       socket.on('gameEnd', (result) => {
         console.log('게임 종료:', result);
 
+        // 게임 상태 변수들 초기화
+        myCards = [];
+        selected = [];
+        myIdx = null;
+        turnInfo = null;
+        field = null;
+        ordered = [];
+        isCardSelectionMode = false;
+
         const gameContent = document.getElementById('gameContent');
         if (!gameContent) return;
 
@@ -1115,24 +1124,7 @@
         }
       });
 
-      // 게임 화면 초기화
-      socket.on('clearGameState', () => {
-        console.log('게임 상태 초기화');
-        // 게임 상태 변수들 초기화
-        myCards = [];
-        selected = [];
-        myIdx = null;
-        turnInfo = null;
-        field = null;
-        ordered = [];
-        isCardSelectionMode = false;
-        
-        // 게임 화면 초기화
-        const gameContent = document.getElementById('gameContent');
-        if (gameContent) {
-          gameContent.innerHTML = '<div style="text-align:center;margin:2em 0;"><h2>다음 게임 준비 중...</h2></div>';
-        }
-      });
+
 
       // 게임 시작 알림 (모든 라운드)
       socket.on('gameStart', () => {

@@ -995,9 +995,6 @@ io.on('connection', (socket) => {
       console.log('게임 종료! 최종 결과:', result);
       io.to(socket.roomId).emit('gameEnd', result);
       
-      // 게임 화면 초기화 이벤트 전송
-      io.to(socket.roomId).emit('clearGameState');
-      
       // 5초 후 자동으로 다음 게임 시작
       setTimeout(() => {
         // 게임 상태만 리셋 (점수, totalScores 등은 유지)
