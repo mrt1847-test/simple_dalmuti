@@ -122,7 +122,8 @@
         font-size: 20px;
         min-height: 56px;
         width: 30%;
-        max-width: 300px;
+        min-width: 25%;
+        max-width: 25%;
         font-weight: bold;
         border-radius: 10px;
         box-shadow: 0 3px 6px rgba(0,0,0,0.15);
@@ -294,7 +295,8 @@
         font-size: 18px;
         min-height: 50px;
         width: 30%;
-        max-width: 250px;
+        min-width: 25%;
+        max-width: 25%;
         font-weight: bold;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
@@ -416,13 +418,12 @@
       return url.searchParams.get(name);
     }
     const nicknameFromQuery = getQueryParam('nickname');
-    // 닉네임 검사 부분 주석처리
-    /*
+    
     if (!nicknameFromQuery) {
       alert('닉네임이 필요합니다.');
       window.location.href = 'index.html';
     }
-    */
+    
     async function fetchRooms() {
       const res = await fetch('/api/rooms');
       const rooms = await res.json();
