@@ -922,12 +922,21 @@
         html += '<h2>게임이 중단되었습니다</h2>';
         html += `<p style="color:#666;font-size:1.1em;">${data.message}</p>`;
         html += '<p style="color:#888;">플레이어가 부족하여 게임을 계속할 수 없습니다.</p>';
-        html += '<p style="color:#f57c00;font-weight:bold;margin-top:1em;">💡 아래 "게임 나가기" 버튼을 클릭하여 로비로 돌아가주세요.</p>';
+        html += '<p style="color:#f57c00;font-weight:bold;margin-top:1em;">💡 상단의 "게임 나가기" 버튼을 클릭하여 로비로 돌아가주세요.</p>';
         html += '</div>';
         gameContent.innerHTML = html;
 
-        appendChat('⚠️ 게임이 중단되었습니다. 게임 나가기 버튼을 클릭하여 로비로 돌아가주세요.', false, true);
+        appendChat('⚠️ 게임이 중단되었습니다. 상단의 게임 나가기 버튼을 클릭하여 로비로 돌아가주세요.', false, true);
         stopTurnCountdown();
+        
+        // 게임 나가기 버튼이 더 잘 보이도록 스타일 강조
+        const leaveBtn = document.getElementById('leaveGameBtn');
+        if (leaveBtn) {
+          leaveBtn.style.background = '#ff5722';
+          leaveBtn.style.color = 'white';
+          leaveBtn.style.fontWeight = 'bold';
+          leaveBtn.style.boxShadow = '0 4px 8px rgba(255, 87, 34, 0.3)';
+        }
       });
 
       // 게임 종료 및 점수
@@ -1014,7 +1023,12 @@
       if (leaveBtn) {
         leaveBtn.addEventListener('click', function() {
           if (confirm('정말 게임을 나가시겠습니까?')) {
+            console.log('게임 나가기 버튼 클릭됨');
             socket.emit('leaveGame');
+            // 버튼 비활성화하여 중복 클릭 방지
+            leaveBtn.disabled = true;
+            leaveBtn.textContent = '나가는 중...';
+            leaveBtn.style.background = '#ccc';
           }
         });
       }

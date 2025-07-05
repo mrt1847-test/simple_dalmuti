@@ -108,11 +108,12 @@ function resetGame(roomId) {
     archbishopCardSelected: false,
     isFirstTurnOfRound: false // 새로운 라운드의 첫 턴인지 추적
   };
-  // players 배열도 정리 (게임 중단 시 모든 플레이어 제거)
-  rooms[roomId].players = [];
-  io.to(roomId).emit('players', rooms[roomId].players);
+  
   // 게임이 중단되었음을 클라이언트에게 알림
   io.to(roomId).emit('gameInterrupted', { message: '게임 진행 중에 플레이어가 나가서 게임이 중단되었습니다.' });
+  
+  // players 배열은 그대로 유지 (남은 플레이어들이 게임 나가기 버튼을 사용할 수 있도록)
+  // 대신 플레이어 목록 업데이트는 하지 않음
 }
 
 function startGameIfReady(roomId) {
@@ -695,8 +696,10 @@ io.on('connection', (socket) => {
     const player = room.players.find(p => p.id === socket.id);
     if (player) {
       if (room.game && (room.game.inProgress || room.game.cardExchangeInProgress)) {
-        // 게임 중 재접속 대기
+        // 게임 중 재접속 대기 - 플레이어는 제거하지 않음
+        console.log(`게임 중 플레이어 ${player.nickname} 연결 끊김 - 재접속 대기`);
       } else {
+        // 게임이 진행 중이 아닐 때만 플레이어 제거
         room.players = room.players.filter(p => p.id !== socket.id);
         io.to(socket.roomId).emit('players', { players: room.players, maxPlayers: room.maxPlayers || MAX_PLAYERS });
         socket.leave(socket.roomId); // 방에서 소켓 제거
@@ -709,14 +712,30 @@ io.on('connection', (socket) => {
   socket.on('leaveGame', () => {
     const room = rooms[socket.roomId];
     if (!room) return;
-    socket.emit('resetClient');
+    
+    // 게임 중단 상태에서도 정상적으로 처리되도록 수정
+    const wasInGame = room.game && (room.game.inProgress || room.game.cardExchangeInProgress);
+    
+    // 플레이어 제거
     room.players = room.players.filter(p => p.id !== socket.id);
-    io.to(socket.roomId).emit('players', { players: room.players, maxPlayers: room.maxPlayers || MAX_PLAYERS });
-    socket.leave(socket.roomId); // 방에서 소켓 제거
-    if (room.game && room.game.inProgress) {
+    
+    // 게임이 진행 중이었다면 게임 중단 처리
+    if (wasInGame) {
       resetGame(socket.roomId);
+    } else {
+      // 게임이 진행 중이 아니었다면 일반적인 플레이어 목록 업데이트
+      io.to(socket.roomId).emit('players', { players: room.players, maxPlayers: room.maxPlayers || MAX_PLAYERS });
     }
-    if (room.players.length === 0) deleteRoom(socket.roomId);
+    
+    socket.leave(socket.roomId); // 방에서 소켓 제거
+    
+    // 방에 아무도 없으면 방 삭제
+    if (room.players.length === 0) {
+      deleteRoom(socket.roomId);
+    }
+    
+    // 클라이언트 리셋은 마지막에 수행
+    socket.emit('resetClient');
   });
 
   // --- 인게임 플레이 로직 ---
