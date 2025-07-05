@@ -345,7 +345,7 @@
             let borderColor = 'transparent';
             let backgroundColor = 'white';
             if (amI) borderColor = '#ff9800';
-            if (isMyTurn) backgroundColor = '#e8f5e8';
+            if (isMyTurn) backgroundColor = '#adf0b1';
 
             html += `<div class="player-card" style="position:absolute;left:${x}px;top:${y}px;width:${playerCardWidth}px;height:${playerCardHeight}px;text-align:center;background:${backgroundColor};border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.08);padding:0.5em 0.2em;display:flex;flex-direction:column;justify-content:center;align-items:center;border: 3px solid ${borderColor}; transition: all 0.3s;">
               <div style='font-weight:bold;font-size:1.1em;'>${p.role}</div>
