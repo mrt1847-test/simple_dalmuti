@@ -121,7 +121,7 @@
         padding: 16px 32px;
         font-size: 20px;
         min-height: 56px;
-        width: 100%;
+        width: 30%;
         max-width: 300px;
         font-weight: bold;
         border-radius: 10px;
@@ -293,6 +293,7 @@
         padding: 16px 24px;
         font-size: 18px;
         min-height: 50px;
+        width: 30%;
         max-width: 250px;
         font-weight: bold;
         border-radius: 8px;
@@ -431,8 +432,10 @@
         const div = document.createElement('div');
         div.className = 'room';
         div.innerHTML = `
-          <span class="room-name">${room.name}</span>
-          <span class="room-players">(${room.playerCount}/${room.maxPlayers}명)</span>
+          <div class="room-info">
+            <span class="room-name">${room.name}</span>
+            <span class="room-players">(${room.playerCount}/${room.maxPlayers}명)</span>
+          </div>
           <button class="join-btn" onclick="joinRoom('${room.id}')">입장</button>
         `;
         list.appendChild(div);
