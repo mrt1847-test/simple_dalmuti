@@ -1057,10 +1057,6 @@
             leaveBtn.disabled = true;
             leaveBtn.textContent = '나가는 중...';
             leaveBtn.style.background = '#ccc';
-            // index.html로 이동
-            setTimeout(() => {
-              window.location.href = '/index.html';
-            }, 500);
           }
         });
       }
@@ -1068,7 +1064,7 @@
       socket.on('resetClient', () => {
         localStorage.clear();
         sessionStorage.clear();
-        location.reload();
+        window.location.href = '/index.html';
       });
 
       socket.on('timerStatus', (data) => {
