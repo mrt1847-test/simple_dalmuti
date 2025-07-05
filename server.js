@@ -253,7 +253,7 @@ function startGameIfReady(roomId) {
       io.to(roomId).emit('gameStart');
       console.log('혁명 기회! gameStart 이벤트 전송. 클라이언트들이 game.html로 이동합니다.');
       
-      // 3초 후에 혁명 선택 요청 (클라이언트들이 game.html로 이동할 시간을 줌)
+      // 5초 후에 혁명 선택 요청 (클라이언트들이 game.html로 이동할 시간을 더 줌)
       setTimeout(() => {
         // 혁명 선택 기회 부여
         const revPlayer = rooms[roomId].game.ordered[joker2Idx];
@@ -267,7 +267,7 @@ function startGameIfReady(roomId) {
             io.to(p.id).emit('waitingForCardExchange', { message: `${revPlayer.nickname}님이 혁명 선언 여부를 선택 중입니다...` });
           }
         });
-      }, 3000);
+      }, 5000);
       // 혁명 선택 결과를 기다림 (아래에 revolutionResult 핸들러 추가 필요)
       return;
     }
@@ -1246,7 +1246,10 @@ io.on('connection', (socket) => {
     if (revolution) {
       // 혁명 발생: 카드 교환 없이 바로 게임 시작
       io.to(roomId).emit('chat', { nickname: 'SYSTEM', msg: '혁명 발생! 카드 교환 없이 게임이 시작됩니다.' });
-      startGameAfterCardExchange(roomId); // 카드 교환 없이 바로 진행
+      // 클라이언트들이 준비될 시간을 주고 게임 시작
+      setTimeout(() => {
+        startGameAfterCardExchange(roomId);
+      }, 1000);
     } else {
       // 기존 카드 교환 단계로 진행 (기존 코드 복사)
       const dalmutiIdx = rooms[roomId].game.ordered.findIndex(p => p.role === '달무티');
