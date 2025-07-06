@@ -308,7 +308,8 @@
 
       function getTurnTimeLeft() {
         if (!turnEndTime) return 0;
-        return Math.max(0, Math.floor((turnEndTime - Date.now()) / 1000));
+        const timeLeft = Math.max(0, Math.floor((turnEndTime - Date.now()) / 1000));
+        return timeLeft;
       }
 
       function updateTurnTimerUI() {
@@ -1098,12 +1099,23 @@
       };
 
       socket.on('turnTimerStart', (data) => {
-        turnEndTime = data.endTime;
-        // 서버에서 전송된 endTime을 기반으로 타이머 시간 계산
-        if (data.endTime) {
+        // 서버에서 전송된 시작 시간과 종료 시간을 사용
+        if (data.startTime && data.endTime) {
+          const serverStartTime = data.startTime;
           const now = Date.now();
-          const timeLeft = Math.max(0, Math.floor((data.endTime - now) / 1000));
-          turnTimeSeconds = timeLeft;
+          
+          // 네트워크 지연을 보정하여 정확한 종료 시간 계산
+          const networkDelay = now - serverStartTime;
+          const correctedEndTime = data.endTime + networkDelay;
+          
+          turnEndTime = correctedEndTime;
+          turnTimeSeconds = data.turnTime || 30;
+          
+          console.log(`타이머 동기화: 서버시작=${serverStartTime}, 현재=${now}, 지연=${networkDelay}ms, 보정된종료시간=${correctedEndTime}`);
+        } else {
+          // fallback
+          turnEndTime = data.endTime;
+          turnTimeSeconds = data.turnTime || 30;
         }
         startTurnCountdown();
       });

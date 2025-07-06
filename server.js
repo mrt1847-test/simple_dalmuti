@@ -498,9 +498,14 @@ function startTurnTimer(roomId) {
   const turnTime = room.turnTime || 30000;
   
   // turnEndTime을 계산해서 모든 유저에게 broadcast
-  const endTime = Date.now() + turnTime;
+  const startTime = Date.now();
+  const endTime = startTime + turnTime;
   room.turnEndTime = endTime;
-  io.to(roomId).emit('turnTimerStart', { endTime });
+  io.to(roomId).emit('turnTimerStart', { 
+    endTime, 
+    startTime,
+    turnTime: turnTime / 1000 
+  });
   room.turnTimer = setTimeout(() => {
     const currentPlayer = room.game.ordered[room.game.turnIdx];
     if (!room.game.finished[room.game.turnIdx]) {
