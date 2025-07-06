@@ -288,7 +288,10 @@
 
       function startTurnCountdown() {
         if (!timerEnabled || !turnEndTime) {
-          stopTurnCountdown();
+          if (turnCountdown) {
+            clearInterval(turnCountdown);
+            turnCountdown = null;
+          }
           updateTurnTimerUI();
           return;
         }
@@ -512,7 +515,10 @@
       // --- 턴 타이머 UI 동기화 ---
       function syncTurnTimer() {
         if (!timerEnabled || !turnEndTime) {
-          stopTurnCountdown();
+          if (turnCountdown) {
+            clearInterval(turnCountdown);
+            turnCountdown = null;
+          }
           updateTurnTimerUI();
           return;
         }
@@ -568,7 +574,6 @@
       });
       socket.on('turnTimeout', () => {
         appendChat('⏰ 제한시간이 초과되어 자동으로 패스 처리되었습니다.', false, true);
-        stopTurnCountdown();
         turnEndTime = null;
         updateTurnTimerUI();
       });
@@ -946,16 +951,6 @@
         gameContent.innerHTML = html;
 
         appendChat('⚠️ 게임이 중단되었습니다. 상단의 게임 나가기 버튼을 클릭하여 로비로 돌아가주세요.', false, true);
-        stopTurnCountdown();
-        
-        // 게임 나가기 버튼이 더 잘 보이도록 스타일 강조
-        const leaveBtn = document.getElementById('leaveGameBtn');
-        if (leaveBtn) {
-          leaveBtn.style.background = '#ff5722';
-          leaveBtn.style.color = 'white';
-          leaveBtn.style.fontWeight = 'bold';
-          leaveBtn.style.boxShadow = '0 4px 8px rgba(255, 87, 34, 0.3)';
-        }
       });
 
       // 게임 종료 및 점수
