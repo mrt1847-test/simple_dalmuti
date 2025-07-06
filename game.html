@@ -242,7 +242,7 @@
         <li>혁명 시 카드교환 단계 생략</li>
         <li>재밌게 즐기셨으면 커피 한잔 사주기</li>
       </ul>
-      <div style="font-size:0.95em;color:#888;">팁: <b>!타이머on</b> / <b>!타이머off</b>를 채팅에 입력해 타이머를 제어할 수 있습니다.<br><b>!스코어</b>를 입력하면 누적 점수를 확인할 수 있습니다.</div>
+      <div style="font-size:0.95em;color:#888;">팁: <b>!타이머on</b> / <b>!타이머off</b>를 채팅에 입력해 타이머를 제어할 수 있습니다.<br><b>!타이머 20</b> / <b>!타이머 60</b>으로 타이머 시간을 조정할 수 있습니다.<br><b>!스코어</b>를 입력하면 누적 점수를 확인할 수 있습니다.</div>
     </div>
   </div>
   <script src="/socket.io/socket.io.js"></script>
@@ -285,6 +285,7 @@
       let turnCountdown = null;
       let turnEndTime = null;
       let timerEnabled = true; // 서버에서 타이머 상태를 받으면 갱신됨
+      let turnTimeSeconds = 30; // 기본 30초
 
       function startTurnCountdown() {
         if (!timerEnabled || !turnEndTime) {
@@ -314,7 +315,7 @@
         const timerDiv = document.getElementById('turnTimer');
         if (timerDiv && timerEnabled && turnInfo && turnInfo.currentPlayer && turnEndTime) {
           const left = getTurnTimeLeft();
-          timerDiv.textContent = `⏰ 남은 시간: ${left}초`;
+          timerDiv.textContent = `⏰ 남은 시간: ${left}초 (${turnTimeSeconds}초 설정)`;
         } else if (timerDiv) {
           timerDiv.textContent = '';
         }
@@ -345,15 +346,20 @@
             const y = tableSize/2 + radius * Math.sin(angle) - playerCardHeight/2;
             const isMyTurn = turnInfo && turnInfo.currentPlayer && turnInfo.currentPlayer.id === p.id;
             const amI = p.id === socket.id;
+            const isFinished = p.finished;
             let borderColor = 'transparent';
             let backgroundColor = 'white';
             if (amI) borderColor = '#ff9800';
             if (isMyTurn) backgroundColor = '#adf0b1';
+            if (isFinished) {
+              backgroundColor = '#e0e0e0';
+              borderColor = '#9e9e9e';
+            }
 
             html += `<div class="player-card" style="position:absolute;left:${x}px;top:${y}px;width:${playerCardWidth}px;height:${playerCardHeight}px;text-align:center;background:${backgroundColor};border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.08);padding:0.5em 0.2em;display:flex;flex-direction:column;justify-content:center;align-items:center;border: 3px solid ${borderColor}; transition: all 0.3s;">
               <div style='font-weight:bold;font-size:1.1em;'>${p.role}</div>
               <div style='margin:0.2em 0;'>${p.nickname}</div>
-              <div style='font-size:0.9em;color:#666;'>카드 ${p.cardCount || 0}장</div>
+              <div style='font-size:0.9em;color:#666;'>${isFinished ? '🏁 완주!' : `카드 ${p.cardCount || 0}장`}</div>
             </div>`;
           });
           // 필드(이전에 낸 카드)를 테이블 중앙에 노출
@@ -1068,6 +1074,13 @@
         updateTurnTimerUI();
       });
 
+      socket.on('timerTimeChanged', (data) => {
+        console.log('[timerTimeChanged] 이벤트 수신:', data);
+        turnTimeSeconds = data.time;
+        // 타이머 시간이 변경되었을 때 UI 업데이트
+        updateTurnTimerUI();
+      });
+
       // 도움말 버튼/모달
       document.getElementById('helpBtn').onclick = function() {
         document.getElementById('helpModal').style.display = 'flex';
@@ -1086,6 +1099,12 @@
 
       socket.on('turnTimerStart', (data) => {
         turnEndTime = data.endTime;
+        // 서버에서 전송된 endTime을 기반으로 타이머 시간 계산
+        if (data.endTime) {
+          const now = Date.now();
+          const timeLeft = Math.max(0, Math.floor((data.endTime - now) / 1000));
+          turnTimeSeconds = timeLeft;
+        }
         startTurnCountdown();
       });
 

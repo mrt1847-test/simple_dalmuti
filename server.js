@@ -493,8 +493,12 @@ function startTurnTimer(roomId) {
   if (!room || !room.game) return;
   if (!room.timerEnabled) return; // 타이머 꺼져있으면 동작 안 함
   if (room.turnTimer) clearTimeout(room.turnTimer);
+  
+  // 설정된 타이머 시간 사용 (기본값: 30초)
+  const turnTime = room.turnTime || 30000;
+  
   // turnEndTime을 계산해서 모든 유저에게 broadcast
-  const endTime = Date.now() + 30000;
+  const endTime = Date.now() + turnTime;
   room.turnEndTime = endTime;
   io.to(roomId).emit('turnTimerStart', { endTime });
   room.turnTimer = setTimeout(() => {
@@ -504,7 +508,7 @@ function startTurnTimer(roomId) {
       // 서버에서 자동 패스 처리
       autoPassTurn(roomId, currentPlayer.id);
     }
-  }, 30000); // 30초
+  }, turnTime);
 }
 
 function clearTurnTimer(roomId) {
@@ -720,17 +724,29 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // 타이머 명령어 처리 복원
-    if (msg === '!타이머on') {
-      room.timerEnabled = true;
-      io.to(socket.roomId).emit('chat', {nickname: 'SYSTEM', msg: '타이머가 켜졌습니다.'});
-      io.to(socket.roomId).emit('timerStatus', { enabled: true });
-      return;
-    }
-    if (msg === '!타이머off') {
-      room.timerEnabled = false;
-      io.to(socket.roomId).emit('chat', {nickname: 'SYSTEM', msg: '타이머가 꺼졌습니다.'});
-      io.to(socket.roomId).emit('timerStatus', { enabled: false });
+    // 타이머 시간 조정 명령어 처리
+    if (msg.startsWith('!타이머')) {
+      const timeMatch = msg.match(/!타이머\s*(\d+)/);
+      if (timeMatch) {
+        const time = parseInt(timeMatch[1]);
+        if (time >= 10 && time <= 120) {
+          room.turnTime = time * 1000; // 초를 밀리초로 변환
+          io.to(socket.roomId).emit('chat', {nickname: 'SYSTEM', msg: `⏰ 타이머 시간이 ${time}초로 설정되었습니다.`});
+          io.to(socket.roomId).emit('timerTimeChanged', { time: time });
+        } else {
+          io.to(socket.roomId).emit('chat', {nickname: 'SYSTEM', msg: '타이머 시간은 10초~120초 사이로 설정해주세요. (예: !타이머 20)'});
+        }
+      } else if (msg === '!타이머on') {
+        room.timerEnabled = true;
+        io.to(socket.roomId).emit('chat', {nickname: 'SYSTEM', msg: '타이머가 켜졌습니다.'});
+        io.to(socket.roomId).emit('timerStatus', { enabled: true });
+      } else if (msg === '!타이머off') {
+        room.timerEnabled = false;
+        io.to(socket.roomId).emit('chat', {nickname: 'SYSTEM', msg: '타이머가 꺼졌습니다.'});
+        io.to(socket.roomId).emit('timerStatus', { enabled: false });
+      } else {
+        io.to(socket.roomId).emit('chat', {nickname: 'SYSTEM', msg: '사용법: !타이머 [시간(초)] (예: !타이머 20, !타이머 60)'});
+      }
       return;
     }
 
