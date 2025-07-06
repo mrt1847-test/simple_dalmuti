@@ -893,37 +893,7 @@
         syncTurnTimer();
       });
 
-      // 카드 제출 결과
-      socket.on('playResult', (data) => {
-        console.log('카드 제출 결과:', data);
-        const player = ordered[data.playerIdx];
-        const cards = data.cards.map(c => c === 'J' ? '🃏' : c).join(' ');
 
-        // 필드 정보 업데이트
-        if (data.lastPlay) {
-          field = { ...data.lastPlay };
-        }
-
-        // 각 플레이어의 카드 수 업데이트
-        if (data.playerHands) {
-          ordered.forEach((p, i) => {
-            p.cardCount = data.playerHands[i];
-          });
-        }
-
-        // 내가 낸 카드면 손에서 제거
-        if (player.id === socket.id && data.myCards) {
-          myCards = data.myCards.slice(); // 서버 상태로 동기화
-          selected = [];
-        }
-        
-        // 완주한 플레이어 체크
-        if (data.finished[data.playerIdx]) {
-          appendChat(`🏁 ${player.nickname}님이 완주했습니다!`, false, true);
-        }
-        renderGame();
-        syncTurnTimer();
-      });
 
       // 패스 결과
       socket.on('passResult', (data) => {
