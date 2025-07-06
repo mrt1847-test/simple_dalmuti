@@ -62,7 +62,8 @@ app.get('/api/rooms', (req, res) => {
     id: r.id,
     name: r.name,
     playerCount: r.players.length,
-    maxPlayers: r.maxPlayers || MAX_PLAYERS
+    maxPlayers: r.maxPlayers || MAX_PLAYERS,
+    inProgress: r.game && r.game.inProgress ? true : false
   })));
 });
 
