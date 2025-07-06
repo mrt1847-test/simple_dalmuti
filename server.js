@@ -706,6 +706,20 @@ io.on('connection', (socket) => {
     if (!room) return;
     const senderNickname = socket.nickname || 'Unknown';
 
+    // 스코어 명령어 처리
+    if (msg === '!스코어') {
+      if (room.game && room.game.totalScores && Object.keys(room.game.totalScores).length > 0) {
+        const scores = Object.entries(room.game.totalScores)
+          .sort(([,a], [,b]) => b - a)
+          .map(([nickname, score], index) => `${index + 1}위: ${nickname} (${score}점)`)
+          .join('\n');
+        io.to(socket.roomId).emit('chat', {nickname: 'SYSTEM', msg: `📊 누적 점수:\n${scores}`});
+      } else {
+        io.to(socket.roomId).emit('chat', {nickname: 'SYSTEM', msg: '아직 게임이 진행되지 않아 점수가 없습니다.'});
+      }
+      return;
+    }
+
     // 타이머 명령어 처리 복원
     if (msg === '!타이머on') {
       room.timerEnabled = true;
