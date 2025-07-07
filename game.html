@@ -248,6 +248,11 @@
   <script src="/socket.io/socket.io.js"></script>
   <script>
     console.log('game.html loaded');
+    // 카드 이미지 경로 반환 함수
+    function getCardImageSrc(card) {
+      if (card === 'J') return 'img/j.png';
+      return `img/${card}.png`;
+    }
     document.addEventListener('DOMContentLoaded', function() {
       // 쿼리스트링에서 roomId, nickname 추출
       function getQueryParam(name) {
@@ -369,20 +374,20 @@
           if (field && field.number) {
             html += '<div style="margin-top:0.7em;font-size:1.1em;text-align:center;">';
             html += '<div style="margin-bottom:0.5em;font-weight:bold;">필드</div>';
-            html += '<div style="display:flex;justify-content:center;">';
+            html += '<div style="display:flex;justify-content:center;position:relative;">';
             if (field.cards && Array.isArray(field.cards)) {
               field.cards.forEach((card, i) => {
-                html += `<div style="overflow:visible;width:20px;flex-grow:1;${i === field.cards.length - 1 ? 'width:80px;flex-grow:0;' : ''}">`;
-                html += `<div style="width:80px;height:130px;background:#fffbe6;border:4px solid #bdb76b;box-shadow:-3px 0px 8px rgba(0,0,0,0.4);box-sizing:border-box;position:relative;border-radius:6px;">`;
-                html += `<div style="position:absolute;top:3px;left:3px;font-size:1em;font-weight:bold;">${card === 'J' ? '🃏' : card}</div>`;
+                html += `<div style=\"overflow:visible;width:20px;flex-grow:1;${i === field.cards.length - 1 ? 'width:80px;flex-grow:0;' : ''};position:relative;\">`;
+                html += `<div style=\"width:80px;height:130px;background:#fffbe6;border:4px solid #bdb76b;box-shadow:-3px 0px 8px rgba(0,0,0,0.4);box-sizing:border-box;position:relative;border-radius:6px;display:flex;align-items:center;justify-content:center;\">`;
+                html += `<img src="${getCardImageSrc(card)}" alt="${card}" style="width:70px;height:110px;object-fit:contain;">`;
                 html += '</div>';
                 html += '</div>';
               });
             } else {
               for (let i = 0; i < field.count; i++) {
-                html += `<div style="overflow:visible;width:20px;flex-grow:1;${i === field.count - 1 ? 'width:80px;flex-grow:0;' : ''}">`;
-                html += `<div style="width:80px;height:130px;background:#fffbe6;border:4px solid #bdb76b;box-shadow:-3px 0px 8px rgba(0,0,0,0.4);box-sizing:border-box;position:relative;border-radius:6px;">`;
-                html += `<div style="position:absolute;top:3px;left:3px;font-size:1em;font-weight:bold;">${field.number === 'J' ? '🃏' : field.number}</div>`;
+                html += `<div style=\"overflow:visible;width:20px;flex-grow:1;${i === field.count - 1 ? 'width:80px;flex-grow:0;' : ''};position:relative;\">`;
+                html += `<div style=\"width:80px;height:130px;background:#fffbe6;border:4px solid #bdb76b;box-shadow:-3px 0px 8px rgba(0,0,0,0.4);box-sizing:border-box;position:relative;border-radius:6px;display:flex;align-items:center;justify-content:center;\">`;
+                html += `<img src="${getCardImageSrc(field.number)}" alt="${field.number}" style="width:70px;height:110px;object-fit:contain;">`;
                 html += '</div>';
                 html += '</div>';
               }
@@ -428,9 +433,9 @@
           html += '<div id="handArea" style="display:flex;background:#eee;padding:10px;box-sizing:border-box;margin:0 auto 10px auto;overflow:visible;">';
           myCards.forEach((card, i) => {
             const isSelected = selected.includes(i);
-            html += `<div class="cardBtn" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''}">`;
-            html += `<div style="width:100px;height:200px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:5px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;">`;
-            html += `<div style="position:absolute;top:5px;left:5px;font-size:1.2em;font-weight:bold;">${card === 'J' ? '🃏' : card}</div>`;
+            html += `<div class="cardBtn" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''};position:relative;">`;
+            html += `<div style="width:100px;height:200px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:5px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;display:flex;align-items:center;justify-content:center;">`;
+            html += `<img src="${getCardImageSrc(card)}" alt="${card}" style="width:90px;height:160px;object-fit:contain;">`;
             html += '</div>';
             html += '</div>';
           });
@@ -653,9 +658,9 @@
           html += '<div id="handArea" style="display:flex;background:#eee;padding:10px;box-sizing:border-box;margin:0 auto 10px auto;overflow:visible;">';
           myCards.forEach((card, i) => {
             const isSelected = selected.includes(i);
-            html += `<div class="cardBtn" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''}">`;
-            html += `<div style="width:100px;height:200px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:5px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;">`;
-            html += `<div style="position:absolute;top:5px;left:5px;font-size:1.2em;font-weight:bold;">${card === 'J' ? '🃏' : card}</div>`;
+            html += `<div class="cardBtn" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''};position:relative;">`;
+            html += `<div style="width:100px;height:200px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:5px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;display:flex;align-items:center;justify-content:center;">`;
+            html += `<img src="${getCardImageSrc(card)}" alt="${card}" style="width:90px;height:160px;object-fit:contain;">`;
             html += '</div>';
             html += '</div>';
           });
@@ -745,9 +750,9 @@
           html += '<div id="handArea" style="display:flex;background:#eee;padding:10px;box-sizing:border-box;margin:0 auto 10px auto;overflow:visible;">';
           myCards.forEach((card, i) => {
             const isSelected = selected.includes(i);
-            html += `<div class="cardBtn" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''}">`;
-            html += `<div style="width:100px;height:200px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:5px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;">`;
-            html += `<div style="position:absolute;top:5px;left:5px;font-size:1.2em;font-weight:bold;">${card === 'J' ? '🃏' : card}</div>`;
+            html += `<div class="cardBtn" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''};position:relative;">`;
+            html += `<div style="width:100px;height:200px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:5px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;display:flex;align-items:center;justify-content:center;">`;
+            html += `<img src="${getCardImageSrc(card)}" alt="${card}" style="width:90px;height:160px;object-fit:contain;">`;
             html += '</div>';
             html += '</div>';
           });
@@ -923,7 +928,6 @@
         html += '<div style="text-align:center;margin-bottom:2em;">';
         html += '<h2>게임이 중단되었습니다</h2>';
         html += `<p style="color:#666;font-size:1.1em;">${data.message}</p>`;
-        html += '<p style="color:#888;">플레이어가 부족하여 게임을 계속할 수 없습니다.</p>';
         html += '<p style="color:#f57c00;font-weight:bold;margin-top:1em;">💡 상단의 "게임 나가기" 버튼을 클릭하여 로비로 돌아가주세요.</p>';
         html += '</div>';
         gameContent.innerHTML = html;
