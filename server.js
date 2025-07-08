@@ -628,28 +628,40 @@ io.on('connection', (socket) => {
     if (room.game && room.game.inProgress) {
       const playerIndex = room.game.ordered.findIndex(p => p.nickname === nickname);
       if (playerIndex !== -1) {
-        console.log(`게임 참가자 ${nickname}가 game.html에 연결했습니다.`);
-        console.log(`이전 소켓 ID: ${rooms[socket.roomId].game.ordered[playerIndex].id}`);
-        console.log(`새로운 소켓 ID: ${socket.id}`);
-        
         // 새로운 소켓 ID로 플레이어 정보 업데이트
         rooms[socket.roomId].game.ordered[playerIndex].id = socket.id;
         const playerInLobbyList = rooms[socket.roomId].players.find(p => p.nickname === nickname);
         if (playerInLobbyList) playerInLobbyList.id = socket.id;
-
-        console.log(`소켓 ID 업데이트 완료: ${nickname} -> ${socket.id}`);
-        
-        // --- 재접속 시 상태에 따른 분기 처리 ---
+        // 1. 혁명 대기 분기
+        if (rooms[socket.roomId].game.revolutionPending) {
+          // 혁명 대상자 찾기 (조커 2장 보유자)
+          const joker2Idx = rooms[socket.roomId].game.ordered.findIndex(p => {
+            const hand = rooms[socket.roomId].game.playerHands[rooms[socket.roomId].game.ordered.findIndex(pp => pp.id === p.id)];
+            return hand && hand.filter(c => c === 'J').length === 2;
+          });
+          if (playerIndex === joker2Idx) {
+            io.to(socket.id).emit('revolutionChoice', {
+              role: rooms[socket.roomId].game.ordered[playerIndex].role,
+              nickname: rooms[socket.roomId].game.ordered[playerIndex].nickname
+            });
+            console.log(`[revolutionPending][재접속] 혁명 대상자에게 revolutionChoice emit: ${nickname}`);
+          } else {
+            const revPlayer = rooms[socket.roomId].game.ordered[joker2Idx];
+            io.to(socket.id).emit('waitingForCardExchange', { message: `${revPlayer ? revPlayer.nickname : '누군가'}님이 혁명 선언 여부를 선택 중입니다...` });
+            console.log(`[revolutionPending][재접속] 혁명 비대상자에게 waitingForCardExchange emit: ${nickname}`);
+          }
+          return callback && callback({ success: true, inGame: true });
+        }
+        // 2. 카드 교환 분기
         if (rooms[socket.roomId].game.cardExchangeInProgress) {
           const dalmutiIdx = rooms[socket.roomId].game.ordered.findIndex(p => p.role === '달무티');
           const archbishopIdx = rooms[socket.roomId].game.ordered.findIndex(p => p.role === '대주교');
           const dalmuti = rooms[socket.roomId].game.ordered[dalmutiIdx];
           const archbishop = rooms[socket.roomId].game.ordered[archbishopIdx];
-
           if (playerIndex === dalmutiIdx) {
             // 재접속한 플레이어가 '달무티'인 경우
             console.log(`달무티 ${nickname} 재접속 - 카드 선택 요청을 다시 보냅니다.`);
-            setTimeout(() => { // 클라이언트가 준비될 시간을 줍니다.
+            setTimeout(() => {
               io.to(socket.id).emit('selectCardsForSlave', {
                 message: '농노에게 줄 카드 2장을 선택하세요.',
                 hand: rooms[socket.roomId].game.playerHands[playerIndex]
@@ -658,7 +670,7 @@ io.on('connection', (socket) => {
           } else if (playerIndex === archbishopIdx) {
             // 재접속한 플레이어가 '대주교'인 경우
             console.log(`대주교 ${nickname} 재접속 - 카드 선택 요청을 다시 보냅니다.`);
-            setTimeout(() => { // 클라이언트가 준비될 시간을 줍니다.
+            setTimeout(() => {
               io.to(socket.id).emit('selectCardsForMiner', {
                 message: '광부에게 줄 카드 1장을 선택하세요.',
                 hand: rooms[socket.roomId].game.playerHands[playerIndex]
@@ -675,22 +687,21 @@ io.on('connection', (socket) => {
             } else if (archbishopIdx !== -1) {
               waitingMessage = `${archbishop.nickname}님이 광부에게 줄 카드를 선택하고 있습니다...`;
             }
-            
             io.to(socket.id).emit('waitingForCardExchange', {
               message: waitingMessage
             });
           }
-        } else {
-          console.log(`[gameSetup emit][재접속 분기] to ${nickname} (${socket.id})`);
-          io.to(socket.id).emit('gameSetup', {
-            ordered: rooms[socket.roomId].game.ordered.map((p, i) => ({ ...p, cardCount: rooms[socket.roomId].game.playerHands[i].length, finished: rooms[socket.roomId].game.finished[i] })),
-            myCards: rooms[socket.roomId].game.playerHands[playerIndex],
-            turnInfo: { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: rooms[socket.roomId].game.isFirstTurnOfRound },
-            field: rooms[socket.roomId].game.lastPlay
-          });
-          console.log(`[gameSetup emit][재접속 분기] ✅ ${nickname}에게 gameSetup 전송 완료`);
+          return callback && callback({ success: true, inGame: true });
         }
-        
+        // 3. 정상 게임 진행 분기
+        io.to(socket.id).emit('gameSetup', {
+          ordered: rooms[socket.roomId].game.ordered.map((p, i) => ({ ...p, cardCount: rooms[socket.roomId].game.playerHands[i].length, finished: rooms[socket.roomId].game.finished[i] })),
+          myCards: rooms[socket.roomId].game.playerHands[playerIndex],
+          turnInfo: { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: rooms[socket.roomId].game.isFirstTurnOfRound },
+          field: rooms[socket.roomId].game.lastPlay
+        });
+        console.log(`[gameSetup emit][재접속 분기] to ${nickname} (${socket.id})`);
+        console.log(`[gameSetup emit][재접속 분기] ✅ ${nickname}에게 gameSetup 전송 완료`);
         return callback && callback({ success: true, inGame: true });
       }
     }
