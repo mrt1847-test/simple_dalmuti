@@ -526,7 +526,7 @@ function clearTurnTimer(roomId) {
 
 function autoPassTurn(roomId, socketId) {
   const idx = rooms[roomId].game.ordered.findIndex(p => p.id === socketId);
-  if (!rooms[roomId].game.inProgress || idx !== rooms[roomId].game.turnIdx || rooms[roomId].game.finished[idx]) return;
+  if (!rooms[roomId].game.inProgress || idx !== rooms[roomId].game.turnIdx || rooms[roomId].game.finished[idx] || rooms[roomId].game.passedThisRound[idx]) return;
   
   // 타임오버로 인한 자동 패스는 첫 턴이라도 허용
   console.log(`\n--- [autoPassTurn] ${rooms[roomId].game.ordered[idx].nickname}이 타임오버로 자동 패스됨 (첫 턴 여부: ${rooms[roomId].game.isFirstTurnOfRound}) ---`);
@@ -553,6 +553,13 @@ function autoPassTurn(roomId, socketId) {
   const activePlayersCount = rooms[roomId].players.length - rooms[roomId].game.finished.filter(f => f).length;
   if (allPassed && activePlayersCount > 1) {
     rooms[roomId].game.passedThisRound = Array(rooms[roomId].game.ordered.length).fill(false);
+    // turnIdx가 finished/passedThisRound가 true인 플레이어가 아니도록 보정
+    do {
+      rooms[roomId].game.turnIdx = (rooms[roomId].game.turnIdx + 1) % rooms[roomId].game.ordered.length;
+    } while (
+      rooms[roomId].game.finished[rooms[roomId].game.turnIdx] ||
+      rooms[roomId].game.passedThisRound[rooms[roomId].game.turnIdx]
+    );
     // 디버그: 라운드 리셋 직후 상태 출력
     console.log('[autoPassTurn] round reset:', {
       turnIdx: rooms[roomId].game.turnIdx,
@@ -579,7 +586,10 @@ function autoPassTurn(roomId, socketId) {
   } else {
     do {
       rooms[roomId].game.turnIdx = (rooms[roomId].game.turnIdx + 1) % rooms[roomId].game.ordered.length;
-    } while (rooms[roomId].game.finished[rooms[roomId].game.turnIdx] || rooms[roomId].game.passedThisRound[rooms[roomId].game.turnIdx]);
+    } while (
+      rooms[roomId].game.finished[rooms[roomId].game.turnIdx] ||
+      rooms[roomId].game.passedThisRound[rooms[roomId].game.turnIdx]
+    );
     io.to(roomId).emit('turnChanged', { turnIdx: rooms[roomId].game.turnIdx, currentPlayer: rooms[roomId].game.ordered[rooms[roomId].game.turnIdx], isFirstTurnOfRound: false });
     startTurnTimer(roomId);
   }
@@ -838,8 +848,8 @@ io.on('connection', (socket) => {
     const room = rooms[socket.roomId];
     if (!room || !room.game) return cb && cb({success: false, message: '방 또는 게임 정보가 없습니다.'});
     const idx = room.game.ordered.findIndex(p => p.id === socket.id);
-    if (!room.game.inProgress || idx !== room.game.turnIdx || room.game.finished[idx]) {
-      return cb && cb({success: false, message: '당신의 차례가 아니거나, 게임이 진행중이 아닙니다.'});
+    if (!room.game.inProgress || idx !== room.game.turnIdx || room.game.finished[idx] || room.game.passedThisRound[idx]) {
+      return cb && cb({success: false, message: '당신의 차례가 아니거나, 이미 패스한 상태이거나, 게임이 진행중이 아닙니다.'});
     }
 
     console.log(`\n--- [playCards] Event from ${rooms[socket.roomId].game.ordered[idx].nickname} (idx: ${idx}) ---`);
@@ -1138,7 +1148,7 @@ io.on('connection', (socket) => {
     const room = rooms[socket.roomId];
     if (!room || !room.game) return;
     const idx = room.game.ordered.findIndex(p => p.id === socket.id);
-    if (!room.game.inProgress || idx !== room.game.turnIdx || room.game.finished[idx]) return;
+    if (!room.game.inProgress || idx !== room.game.turnIdx || room.game.finished[idx] || room.game.passedThisRound[idx]) return;
     
     // 새로운 라운드의 첫 턴에는 패스할 수 없음
     if (rooms[socket.roomId].game.isFirstTurnOfRound) {
@@ -1168,6 +1178,13 @@ io.on('connection', (socket) => {
     if (allPassed && activePlayersCount > 1) {
       // 라운드 리셋
       rooms[socket.roomId].game.passedThisRound = Array(rooms[socket.roomId].game.ordered.length).fill(false);
+      // turnIdx가 finished/passedThisRound가 true인 플레이어가 아니도록 보정
+      do {
+        rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
+      } while (
+        rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx] ||
+        rooms[socket.roomId].game.passedThisRound[rooms[socket.roomId].game.turnIdx]
+      );
       // 디버그: 라운드 리셋 직후 상태 출력
       console.log('[passTurn] round reset:', {
         turnIdx: rooms[socket.roomId].game.turnIdx,
