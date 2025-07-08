@@ -1037,8 +1037,7 @@ io.on('connection', (socket) => {
             do {
               rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
             } while (
-              rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx] ||
-              rooms[socket.roomId].game.passedThisRound[rooms[socket.roomId].game.turnIdx]
+              rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]
             );
             io.to(socket.roomId).emit('turnChanged', {
               turnIdx: rooms[socket.roomId].game.turnIdx,
