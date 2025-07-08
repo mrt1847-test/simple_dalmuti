@@ -509,7 +509,7 @@ function startTurnTimer(roomId) {
   });
   room.turnTimer = setTimeout(() => {
     const currentPlayer = room.game.ordered[room.game.turnIdx];
-    if (!room.game.finished[room.game.turnIdx]) {
+    if (currentPlayer && !room.game.finished[room.game.turnIdx]) {
       io.to(roomId).emit('turnTimeout'); // 클라이언트에 알림
       // 서버에서 자동 패스 처리
       autoPassTurn(roomId, currentPlayer.id);
@@ -524,8 +524,9 @@ function clearTurnTimer(roomId) {
 }
 
 function autoPassTurn(roomId, socketId) {
+  if (!rooms[roomId] || !rooms[roomId].game || !socketId) return;
   const idx = rooms[roomId].game.ordered.findIndex(p => p.id === socketId);
-  if (!rooms[roomId].game.inProgress || idx !== rooms[roomId].game.turnIdx || rooms[roomId].game.finished[idx]) return;
+  if (!rooms[roomId].game.inProgress || idx === -1 || idx !== rooms[roomId].game.turnIdx || rooms[roomId].game.finished[idx]) return;
   
   // 타임오버로 인한 자동 패스는 첫 턴이라도 허용
   console.log(`\n--- [autoPassTurn] ${rooms[roomId].game.ordered[idx].nickname}이 타임오버로 자동 패스됨 (첫 턴 여부: ${rooms[roomId].game.isFirstTurnOfRound}) ---`);
