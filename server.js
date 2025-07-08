@@ -1003,7 +1003,21 @@ io.on('connection', (socket) => {
         }, 5000);
         return;
       }
-      // 라운드 리셋: passedThisRound 전체 false, lastPlay = null, isFirstTurnOfRound = true
+      // 4. 라운드 리셋: passedThisRound 전체 false, lastPlay = null, isFirstTurnOfRound = true
+      // --- 라운드 리셋 전에 playResult를 한 번 더 emit (클라 완주 상태 반영용) ---
+      rooms[socket.roomId].game.ordered.forEach((p, i) => {
+        const targetSocket = io.sockets.sockets.get(p.id);
+        if (targetSocket) {
+          targetSocket.emit('playResult', {
+            playerIdx: idx,
+            cards,
+            lastPlay: rooms[socket.roomId].game.lastPlay,
+            finished: rooms[socket.roomId].game.finished,
+            playerHands: rooms[socket.roomId].game.playerHands.map(hand => hand.length),
+            myCards: rooms[socket.roomId].game.playerHands[i]
+          });
+        }
+      });
       rooms[socket.roomId].game.passedThisRound = Array(rooms[socket.roomId].game.ordered.length).fill(false);
       rooms[socket.roomId].game.lastPlay = null;
       rooms[socket.roomId].game.isFirstTurnOfRound = true;
