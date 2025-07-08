@@ -532,7 +532,19 @@ function autoPassTurn(roomId, socketId) {
   console.log(`\n--- [autoPassTurn] ${rooms[roomId].game.ordered[idx].nickname}이 타임오버로 자동 패스됨 (첫 턴 여부: ${rooms[roomId].game.isFirstTurnOfRound}) ---`);
   
   rooms[roomId].game.passedThisRound[idx] = true; // <--- 자동 패스도 표시
-  io.to(roomId).emit('passResult', {playerIdx: idx, passes: null});
+  // io.to(roomId).emit('passResult', {playerIdx: idx, passes: null}); // <--- passResult emit 제거
+  // 디버그: 자동 패스 직후 상태 출력
+  console.log('[autoPassTurn] after auto-pass:', {
+    turnIdx: rooms[roomId].game.turnIdx,
+    ordered: rooms[roomId].game.ordered.map(p => p.nickname),
+    finished: rooms[roomId].game.finished,
+    passedThisRound: rooms[roomId].game.passedThisRound,
+    currentPlayer: rooms[roomId].game.ordered[rooms[roomId].game.turnIdx]?.nickname,
+    passedPlayers: rooms[roomId].game.ordered.map((p, i) => rooms[roomId].game.passedThisRound[i] ? p.nickname : null).filter(Boolean)
+  });
+  // 시스템 채팅: 이번 라운드 패스한 플레이어 목록
+  const passedPlayers = rooms[roomId].game.ordered.map((p, i) => rooms[roomId].game.passedThisRound[i] ? p.nickname : null).filter(Boolean);
+  io.to(roomId).emit('chat', {nickname: 'SYSTEM', msg: `이번 라운드 패스한 플레이어: ${passedPlayers.length > 0 ? passedPlayers.join(', ') : '없음'}`});
   // 라운드 종료 조건: 마지막 낸 사람을 제외한 미완주자 모두 패스?
   const lastPlayIdx = rooms[roomId].game.lastPlay ? rooms[roomId].game.lastPlay.playerIdx : null;
   const activeIdxs = rooms[roomId].game.ordered.map((p, i) => i)
@@ -541,6 +553,14 @@ function autoPassTurn(roomId, socketId) {
   const activePlayersCount = rooms[roomId].players.length - rooms[roomId].game.finished.filter(f => f).length;
   if (allPassed && activePlayersCount > 1) {
     rooms[roomId].game.passedThisRound = Array(rooms[roomId].game.ordered.length).fill(false);
+    // 디버그: 라운드 리셋 직후 상태 출력
+    console.log('[autoPassTurn] round reset:', {
+      turnIdx: rooms[roomId].game.turnIdx,
+      ordered: rooms[roomId].game.ordered.map(p => p.nickname),
+      finished: rooms[roomId].game.finished,
+      passedThisRound: rooms[roomId].game.passedThisRound,
+      currentPlayer: rooms[roomId].game.ordered[rooms[roomId].game.turnIdx]?.nickname
+    });
     if (rooms[roomId].game.lastPlay) {
       rooms[roomId].game.turnIdx = rooms[roomId].game.lastPlay.playerIdx;
       if (rooms[roomId].game.finished[rooms[roomId].game.turnIdx]) {
@@ -872,6 +892,14 @@ io.on('connection', (socket) => {
     rooms[socket.roomId].game.passedThisRound = Array(rooms[socket.roomId].game.ordered.length).fill(false); // <--- 카드 내면 패스상태 초기화
     rooms[socket.roomId].game.passes = 0;
     rooms[socket.roomId].game.isFirstTurnOfRound = false; // 카드를 내면 첫 턴 플래그 해제
+    // 디버그: 턴/패스 상태 출력
+    console.log('[playCards] after play:', {
+      turnIdx: rooms[socket.roomId].game.turnIdx,
+      ordered: rooms[socket.roomId].game.ordered.map(p => p.nickname),
+      finished: rooms[socket.roomId].game.finished,
+      passedThisRound: rooms[socket.roomId].game.passedThisRound,
+      currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx]?.nickname
+    });
 
     // 1 또는 1+조커를 낸 경우: 즉시 모든 미완주 플레이어 패스 처리 및 라운드 리셋
     if (num === 1) {
@@ -879,7 +907,7 @@ io.on('connection', (socket) => {
       const activeIdxs = rooms[socket.roomId].game.ordered.map((p, i) => i).filter(i => i !== idx && !rooms[socket.roomId].game.finished[i]);
       activeIdxs.forEach(i => {
         rooms[socket.roomId].game.passedThisRound[i] = true; // <--- 1을 내면 나머지 미완주자 모두 패스 처리
-        io.to(socket.roomId).emit('passResult', {playerIdx: i, passes: null});
+        // io.to(socket.roomId).emit('passResult', {playerIdx: i, passes: null}); // <--- passResult emit 제거
       });
       
       // 1을 낸 플레이어의 게임 완주 처리
@@ -1094,7 +1122,7 @@ io.on('connection', (socket) => {
     // 다음 턴
     do {
       rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
-    } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]);
+    } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx] || rooms[socket.roomId].game.passedThisRound[rooms[socket.roomId].game.turnIdx]);
     
     io.to(socket.roomId).emit('turnChanged', { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: false });
     startTurnTimer(socket.roomId);
@@ -1114,8 +1142,16 @@ io.on('connection', (socket) => {
     
     clearTurnTimer(socket.roomId);
     rooms[socket.roomId].game.passedThisRound[idx] = true; // <--- 패스한 플레이어 표시
-    io.to(socket.roomId).emit('passResult', {playerIdx: idx, passes: null});
-
+    // io.to(socket.roomId).emit('passResult', {playerIdx: idx, passes: null}); // <--- passResult emit 제거
+    // 디버그: 패스 직후 상태 출력
+    console.log('[passTurn] after pass:', {
+      turnIdx: rooms[socket.roomId].game.turnIdx,
+      ordered: rooms[socket.roomId].game.ordered.map(p => p.nickname),
+      finished: rooms[socket.roomId].game.finished,
+      passedThisRound: rooms[socket.roomId].game.passedThisRound,
+      currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx]?.nickname,
+      passedPlayers: rooms[socket.roomId].game.ordered.map((p, i) => rooms[socket.roomId].game.passedThisRound[i] ? p.nickname : null).filter(Boolean)
+    });
     // 라운드 종료 조건: 마지막 낸 사람을 제외한 미완주자 모두 패스?
     const lastPlayIdx = rooms[socket.roomId].game.lastPlay ? rooms[socket.roomId].game.lastPlay.playerIdx : null;
     const activeIdxs = rooms[socket.roomId].game.ordered.map((p, i) => i)
@@ -1126,6 +1162,14 @@ io.on('connection', (socket) => {
     if (allPassed && activePlayersCount > 1) {
       // 라운드 리셋
       rooms[socket.roomId].game.passedThisRound = Array(rooms[socket.roomId].game.ordered.length).fill(false);
+      // 디버그: 라운드 리셋 직후 상태 출력
+      console.log('[passTurn] round reset:', {
+        turnIdx: rooms[socket.roomId].game.turnIdx,
+        ordered: rooms[socket.roomId].game.ordered.map(p => p.nickname),
+        finished: rooms[socket.roomId].game.finished,
+        passedThisRound: rooms[socket.roomId].game.passedThisRound,
+        currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx]?.nickname
+      });
       if (rooms[socket.roomId].game.lastPlay) {
         rooms[socket.roomId].game.turnIdx = rooms[socket.roomId].game.lastPlay.playerIdx;
         if (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]) {
@@ -1146,6 +1190,13 @@ io.on('connection', (socket) => {
       do {
         rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
       } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx] || rooms[socket.roomId].game.passedThisRound[rooms[socket.roomId].game.turnIdx]);
+      // 디버그: 턴 이동 후 상태 출력
+      console.log('[playCards] next turn:', {
+        turnIdx: rooms[socket.roomId].game.turnIdx,
+        currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx]?.nickname,
+        finished: rooms[socket.roomId].game.finished,
+        passedThisRound: rooms[socket.roomId].game.passedThisRound
+      });
       io.to(socket.roomId).emit('turnChanged', { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: false });
       startTurnTimer(socket.roomId);
     }
