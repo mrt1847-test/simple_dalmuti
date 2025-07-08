@@ -1020,6 +1020,7 @@ io.on('connection', (socket) => {
       rooms[socket.roomId].game.lastPlay = null;
       rooms[socket.roomId].game.isFirstTurnOfRound = true; // 1을 내서 새로운 라운드 시작 시 첫 턴 플래그 설정
       setTimeout(() => {
+        rooms[socket.roomId].game.passedThisRound = Array(rooms[socket.roomId].game.ordered.length).fill(false);
         io.to(socket.roomId).emit('newRound', {turnIdx: rooms[socket.roomId].game.turnIdx, lastPlay: null, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: true});
         startTurnTimer(socket.roomId);
       }, 400);
@@ -1176,7 +1177,6 @@ io.on('connection', (socket) => {
     const activePlayersCount = rooms[socket.roomId].players.length - rooms[socket.roomId].game.finished.filter(f => f).length;
 
     if (allPassed && activePlayersCount > 1) {
-      // 라운드 리셋
       rooms[socket.roomId].game.passedThisRound = Array(rooms[socket.roomId].game.ordered.length).fill(false);
       // newRound emit 직전 반드시 보정
       do {
@@ -1203,6 +1203,7 @@ io.on('connection', (socket) => {
       }
       rooms[socket.roomId].game.lastPlay = null;
       rooms[socket.roomId].game.isFirstTurnOfRound = true;
+      
       io.to(socket.roomId).emit('newRound', {turnIdx: rooms[socket.roomId].game.turnIdx, lastPlay: null, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: true});
       startTurnTimer(socket.roomId);
     } else if (activePlayersCount === 1) {
