@@ -1026,10 +1026,29 @@ io.on('connection', (socket) => {
             });
           }
         });
-        // 만약 hand.length === 0 (즉, 마지막 카드로 1을 내서 완주)라면, 턴을 넘기지 않고 리턴
+        // hand.length === 0 (마지막 카드로 1을 내서 완주)라면, 게임이 끝났는지 체크 후, 아니면 다음 미완주자에게 턴 넘기기
         if (hand.length === 0) {
-          // 게임 종료 체크는 이미 위에서 처리됨
-          return;
+          const finishedCount = rooms[socket.roomId].game.finished.filter(f => f).length;
+          if (finishedCount >= rooms[socket.roomId].players.length - 1) {
+            // 게임 종료는 이미 위에서 처리됨
+            return;
+          } else {
+            // 다음 미완주자에게 턴 넘기기
+            do {
+              rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
+            } while (
+              rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx] ||
+              rooms[socket.roomId].game.passedThisRound[rooms[socket.roomId].game.turnIdx]
+            );
+            io.to(socket.roomId).emit('turnChanged', {
+              turnIdx: rooms[socket.roomId].game.turnIdx,
+              currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx],
+              isFirstTurnOfRound: false
+            });
+            startTurnTimer(socket.roomId);
+            cb && cb({success: true});
+            return;
+          }
         }
         // 그 다음 미완주자에게 턴 넘기기 (hand가 남아있는 경우만)
         do {
