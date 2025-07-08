@@ -490,7 +490,7 @@ function startGameAfterCardExchange(roomId) {
   
   // 바로 게임 세팅 데이터 전송
   rooms[roomId].game.ordered.forEach((p, i) => {
-    console.log(`${p.nickname}에게 gameSetup 전송 - 카드 ${rooms[roomId].game.playerHands[i].length}장`);
+    console.log(`[gameSetup emit][startGameAfterCardExchange] to ${p.nickname} (${p.id}) - 카드 ${rooms[roomId].game.playerHands[i].length}장`);
     try {
       io.to(p.id).emit('gameSetup', {
         ordered: rooms[roomId].game.ordered.map((p, i) => ({ ...p, cardCount: rooms[roomId].game.playerHands[i].length, finished: rooms[roomId].game.finished[i] })),
@@ -498,9 +498,9 @@ function startGameAfterCardExchange(roomId) {
         turnInfo: { turnIdx: rooms[roomId].game.turnIdx, currentPlayer: rooms[roomId].game.ordered[rooms[roomId].game.turnIdx], isFirstTurnOfRound: rooms[roomId].game.isFirstTurnOfRound },
         field: rooms[roomId].game.lastPlay
       });
-      console.log(`✅ ${p.nickname}에게 gameSetup 전송 완료`);
+      console.log(`[gameSetup emit][startGameAfterCardExchange] ✅ ${p.nickname}에게 gameSetup 전송 완료`);
     } catch (error) {
-      console.error(`❌ ${p.nickname}에게 gameSetup 전송 실패:`, error);
+      console.error(`[gameSetup emit][startGameAfterCardExchange] ❌ ${p.nickname}에게 gameSetup 전송 실패:`, error);
     }
   });
   console.log('gameSetup 데이터 전송 완료.');
@@ -685,13 +685,14 @@ io.on('connection', (socket) => {
             });
           }
         } else {
-          // 카드 교환 단계가 아닐 때만 gameSetup 전송
+          console.log(`[gameSetup emit][재접속 분기] to ${nickname} (${socket.id})`);
           io.to(socket.id).emit('gameSetup', {
             ordered: rooms[socket.roomId].game.ordered.map((p, i) => ({ ...p, cardCount: rooms[socket.roomId].game.playerHands[i].length, finished: rooms[socket.roomId].game.finished[i] })),
             myCards: rooms[socket.roomId].game.playerHands[playerIndex],
             turnInfo: { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: rooms[socket.roomId].game.isFirstTurnOfRound },
             field: rooms[socket.roomId].game.lastPlay
           });
+          console.log(`[gameSetup emit][재접속 분기] ✅ ${nickname}에게 gameSetup 전송 완료`);
         }
         
         return callback && callback({ success: true, inGame: true });
