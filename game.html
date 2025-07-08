@@ -53,6 +53,24 @@
       body { height: auto; min-height: 100vh; padding: 10px; }
       #mainWrap { flex-direction: column; align-items: center; flex-wrap: nowrap; padding-bottom: 33vh; }
       #gameArea { min-width: auto; width: 100%; max-width: 400px; }
+      
+      /* 게임 나가기 버튼 모바일 최적화 */
+      #leaveGameBtn {
+        padding: 10px 16px !important;
+        font-size: 16px !important;
+        min-height: 44px !important;
+        background: #e57373 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+      }
+      
+      /* 도움말 버튼 모바일 최적화 */
+      #helpBtn {
+        padding: 10px 16px !important;
+        font-size: 16px !important;
+        min-height: 44px !important;
+      }
+      
       #chatWrap {
         display: flex !important;
         position: fixed;
@@ -220,32 +238,42 @@
         <li>패스가 계속 선언되어서 한바퀴가 돌아서 맨 마지막 카드를 낸 플레이어의 차례가 되면 그 플래이어가 선으로 새로운 라운드를 시작한다.</li>
         <li>위의 과정을 반복해서 카드를 맨 처음 다 털어버리는 순서로 점수가 부여된다</li>
         <li>다음 게임은 전 게임의 순위로 신분이 배정된다.</li>
-        <li>혁명은 복잡해서 구현 안할거다.</li>
+        <li>최초 카드 배분시 조커 2장 보유시 혁명 여부 선택가능</li>
+        <li>혁명 시 카드교환 단계 생략</li>
         <li>재밌게 즐기셨으면 커피 한잔 사주기</li>
       </ul>
-      <div style="font-size:0.95em;color:#888;">팁: <b>!타이머on</b> / <b>!타이머off</b>를 채팅에 입력해 타이머를 제어할 수 있습니다.</div>
+      <div style="font-size:0.95em;color:#888;">팁: <b>!타이머on</b> / <b>!타이머off</b>를 채팅에 입력해 타이머를 제어할 수 있습니다.<br><b>!타이머 20</b> / <b>!타이머 60</b>으로 타이머 시간을 조정할 수 있습니다.<br><b>!스코어</b>를 입력하면 누적 점수를 확인할 수 있습니다.</div>
     </div>
   </div>
   <script src="/socket.io/socket.io.js"></script>
   <script>
     console.log('game.html loaded');
+    // 카드 이미지 경로 반환 함수
+    function getCardImageSrc(card) {
+      if (card === 'J') return 'img/j.png';
+      return `img/${card}.png`;
+    }
     document.addEventListener('DOMContentLoaded', function() {
-      const nickname = localStorage.getItem('dalmuti_nickname');
-      if (!nickname) window.location.href = '/index.html';
-
-      const socket = io("https://simple-dalmuti.onrender.com");
+      // 쿼리스트링에서 roomId, nickname 추출
+      function getQueryParam(name) {
+        const url = new URL(window.location.href);
+        return url.searchParams.get(name);
+      }
+      const roomId = getQueryParam('roomId');
+      const nickname = getQueryParam('nickname');
+      if (!roomId || !nickname) {
+        alert('잘못된 접근입니다.');
+        window.location.href = '/room-list.html';
+        return;
+      }
+      const socket = io();
       socket.on('connect', () => {
         console.log('socket connected! id:', socket.id);
       });
-      socket.on('roleAssigned', (ordered) => {
-        console.log('roleAssigned:', ordered, '내 소켓 id:', socket.id);
-      });
-
-      // ★ 서버에 닉네임을 알림
-      socket.emit('join', nickname, (res) => {
+      socket.emit('join', { roomId, nickname }, (res) => {
         if (!res.success && res.message !== '중복 닉네임') {
           alert(res.message);
-          window.location.href = '/index.html';
+          window.location.href = '/room-list.html';
         }
       });
 
@@ -260,35 +288,42 @@
       console.log('roleAssigned:', ordered);
 
       let turnCountdown = null;
-      let turnTimeLeft = 30;
+      let turnEndTime = null;
       let timerEnabled = true; // 서버에서 타이머 상태를 받으면 갱신됨
+      let turnTimeSeconds = 30; // 기본 30초
 
       function startTurnCountdown() {
-        if (!timerEnabled) {
-          stopTurnCountdown();
+        if (!timerEnabled || !turnEndTime) {
+          if (turnCountdown) {
+            clearInterval(turnCountdown);
+            turnCountdown = null;
+          }
           updateTurnTimerUI();
           return;
         }
         clearInterval(turnCountdown);
-        turnTimeLeft = 30;
         updateTurnTimerUI();
         turnCountdown = setInterval(() => {
-          turnTimeLeft--;
           updateTurnTimerUI();
-          if (turnTimeLeft <= 0) {
+          if (getTurnTimeLeft() <= 0) {
             clearInterval(turnCountdown);
           }
         }, 1000);
       }
 
+      function getTurnTimeLeft() {
+        if (!turnEndTime) return 0;
+        const timeLeft = Math.max(0, Math.floor((turnEndTime - Date.now()) / 1000));
+        return timeLeft;
+      }
+
       function updateTurnTimerUI() {
         const timerDiv = document.getElementById('turnTimer');
-        if (timerDiv) {
-          if (timerEnabled && turnInfo && turnInfo.currentPlayer && turnInfo.currentPlayer.id === socket.id) {
-            timerDiv.textContent = `⏰ 남은 시간: ${turnTimeLeft}초`;
-          } else {
-            timerDiv.textContent = '';
-          }
+        if (timerDiv && timerEnabled && turnInfo && turnInfo.currentPlayer && turnEndTime) {
+          const left = getTurnTimeLeft();
+          timerDiv.textContent = `⏰ 남은 시간: ${left}초 (${turnTimeSeconds}초 설정)`;
+        } else if (timerDiv) {
+          timerDiv.textContent = '';
         }
       }
 
@@ -301,6 +336,7 @@
 
         // 1. 원탁 그리기
         if (ordered && ordered.length > 0) {
+          console.log('원탁 그리기 - ordered 데이터:', ordered);
           const n = ordered.length;
           // 화면 크기에 따라 원탁 크기 조정
           const isMobile = window.innerWidth <= 768;
@@ -317,15 +353,20 @@
             const y = tableSize/2 + radius * Math.sin(angle) - playerCardHeight/2;
             const isMyTurn = turnInfo && turnInfo.currentPlayer && turnInfo.currentPlayer.id === p.id;
             const amI = p.id === socket.id;
+            const isFinished = p.cardCount === 0;
             let borderColor = 'transparent';
+            let backgroundColor = 'white';
             if (amI) borderColor = '#ff9800';
-            else if (isMyTurn) borderColor = '#4caf50';
+            if (isMyTurn) backgroundColor = '#adf0b1';
+            if (isFinished) {
+              backgroundColor = '#e0e0e0';
+              borderColor = '#9e9e9e';
+            }
 
-            html += `<div class="player-card" style="position:absolute;left:${x}px;top:${y}px;width:${playerCardWidth}px;height:${playerCardHeight}px;text-align:center;background:white;border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.08);padding:0.5em 0.2em;display:flex;flex-direction:column;justify-content:center;align-items:center;border: 3px solid ${borderColor}; transition: border-color 0.3s;">
+            html += `<div class="player-card" style="position:absolute;left:${x}px;top:${y}px;width:${playerCardWidth}px;height:${playerCardHeight}px;text-align:center;background:${backgroundColor};border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.08);padding:0.5em 0.2em;display:flex;flex-direction:column;justify-content:center;align-items:center;border: 3px solid ${borderColor}; transition: all 0.3s;">
               <div style='font-weight:bold;font-size:1.1em;'>${p.role}</div>
               <div style='margin:0.2em 0;'>${p.nickname}</div>
-              <div style='font-size:0.9em;color:#666;'>카드 ${p.cardCount || 0}장</div>
-              ${p.card ? `<div style='font-size:0.9em;color:#888;'>숫자: ${p.card}</div>` : ''}
+              <div style='font-size:0.9em;color:#666;'>${isFinished ? '🏁 완주!' : `카드 ${p.cardCount || 0}장`}</div>
             </div>`;
           });
           // 필드(이전에 낸 카드)를 테이블 중앙에 노출
@@ -333,13 +374,25 @@
           if (field && field.number) {
             html += '<div style="margin-top:0.7em;font-size:1.1em;text-align:center;">';
             html += '<div style="margin-bottom:0.5em;font-weight:bold;">필드</div>';
-            html += '<div style="display:flex;justify-content:center;">';
-            for (let i = 0; i < field.count; i++) {
-              html += `<div style="overflow:visible;width:20px;flex-grow:1;${i === field.count - 1 ? 'width:80px;flex-grow:0;' : ''}">`;
-              html += `<div style="width:80px;height:130px;background:#fffbe6;border:4px solid #bdb76b;box-shadow:-3px 0px 8px rgba(0,0,0,0.4);box-sizing:border-box;position:relative;border-radius:6px;">`;
-              html += `<div style="position:absolute;top:3px;left:3px;font-size:1em;font-weight:bold;">${field.number === 'J' ? '🃏' : field.number}</div>`;
-              html += '</div>';
-              html += '</div>';
+            html += '<div style="display:flex;justify-content:center;position:relative;">';
+            if (field.cards && Array.isArray(field.cards)) {
+              field.cards.forEach((card, i) => {
+                html += `<div style=\"overflow:visible;width:20px;flex-grow:1;${i === field.cards.length - 1 ? 'width:80px;flex-grow:0;' : ''};position:relative;\">`;
+                html += `<div style=\"width:80px;height:126px;background:#fffbe6;border:4px solid #bdb76b;box-shadow:-3px 0px 8px rgba(0,0,0,0.4);box-sizing:border-box;position:relative;border-radius:6px;display:flex;align-items:center;justify-content:center;\">`;
+                html += `<img src=\"${getCardImageSrc(card)}\" alt=\"${card}\" style=\"width:100%;height:100%;object-fit:contain;\">`;
+                html += `<div style=\"position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:1.7em;font-weight:bold;color:#111;text-shadow:0 0 6px #fff, 0 0 3px #fff, 0 0 1px #fff;pointer-events:none;\">${card === 'J' ? 'J' : card}</div>`;
+                html += '</div>';
+                html += '</div>';
+              });
+            } else {
+              for (let i = 0; i < field.count; i++) {
+                html += `<div style=\"overflow:visible;width:20px;flex-grow:1;${i === field.count - 1 ? 'width:80px;flex-grow:0;' : ''};position:relative;\">`;
+                html += `<div style=\"width:80px;height:126px;background:#fffbe6;border:4px solid #bdb76b;box-shadow:-3px 0px 8px rgba(0,0,0,0.4);box-sizing:border-box;position:relative;border-radius:6px;display:flex;align-items:center;justify-content:center;\">`;
+                html += `<img src=\"${getCardImageSrc(field.number)}\" alt=\"${field.number}\" style=\"width:100%;height:100%;object-fit:contain;\">`;
+                html += `<div style=\"position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:1.7em;font-weight:bold;color:#111;text-shadow:0 0 6px #fff, 0 0 3px #fff, 0 0 1px #fff;pointer-events:none;\">${field.number === 'J' ? 'J' : field.number}</div>`;
+                html += '</div>';
+                html += '</div>';
+              }
             }
             html += '</div>';
             html += `<div style="margin-top:0.5em;font-size:0.9em;color:#666;"><b>필드:</b> 숫자 ${field.number} (${field.count}장)</div>`;
@@ -382,9 +435,10 @@
           html += '<div id="handArea" style="display:flex;background:#eee;padding:10px;box-sizing:border-box;margin:0 auto 10px auto;overflow:visible;">';
           myCards.forEach((card, i) => {
             const isSelected = selected.includes(i);
-            html += `<div class="cardBtn" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''}">`;
-            html += `<div style="width:100px;height:200px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:5px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;">`;
-            html += `<div style="position:absolute;top:5px;left:5px;font-size:1.2em;font-weight:bold;">${card === 'J' ? '🃏' : card}</div>`;
+            html += `<div class="cardBtn" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''};position:relative;">`;
+            html += `<div style="width:100px;height:157px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:5px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;display:flex;align-items:center;justify-content:center;">`;
+            html += `<img src=\"${getCardImageSrc(card)}\" alt=\"${card}\" style=\"width:100%;height:100%;object-fit:contain;\">`;
+            html += `<div style=\"position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:1.7em;font-weight:bold;color:#111;text-shadow:0 0 6px #fff, 0 0 3px #fff, 0 0 1px #fff;pointer-events:none;\">${card === 'J' ? 'J' : card}</div>`;
             html += '</div>';
             html += '</div>';
           });
@@ -476,22 +530,21 @@
 
       // --- 턴 타이머 UI 동기화 ---
       function syncTurnTimer() {
-        if (!timerEnabled) {
-          stopTurnCountdown();
+        if (!timerEnabled || !turnEndTime) {
+          if (turnCountdown) {
+            clearInterval(turnCountdown);
+            turnCountdown = null;
+          }
           updateTurnTimerUI();
           return;
         }
-        if (turnInfo && turnInfo.currentPlayer && turnInfo.currentPlayer.id === socket.id) {
-          startTurnCountdown();
-        } else {
-          stopTurnCountdown();
-        }
+        startTurnCountdown();
       }
 
       socket.on('turnChanged', (data) => {
         turnInfo = data;
         renderGame();
-        syncTurnTimer();
+        // turnTimerStart 이벤트에서 타이머가 시작됨
       });
       socket.on('newRound', (data) => {
         turnInfo = data;
@@ -502,7 +555,7 @@
           appendChat('🎯 새로운 라운드의 첫 턴입니다! 패스할 수 없으니 카드를 내주세요.', false, true);
         }
         renderGame();
-        syncTurnTimer();
+        // turnTimerStart 이벤트에서 타이머가 시작됨
       });
       socket.on('playResult', (data) => {
         console.log('카드 제출 결과:', data);
@@ -523,25 +576,22 @@
         }
 
         // 내가 낸 카드면 손에서 제거
-        if (player.id === socket.id) {
-          data.cards.forEach(card => {
-            const index = myCards.indexOf(card);
-            if (index > -1) myCards.splice(index, 1);
-          });
+        if (player.id === socket.id && data.myCards) {
+          myCards = data.myCards.slice(); // 서버 상태로 동기화
+          selected = [];
         }
         
         // 완주한 플레이어 체크
         if (data.finished[data.playerIdx]) {
           appendChat(`🏁 ${player.nickname}님이 완주했습니다!`, false, true);
         }
-
-        appendChat(`🎴 ${player.nickname}님이 ${cards}를 냈습니다.`, false, true);
         renderGame();
         syncTurnTimer();
       });
       socket.on('turnTimeout', () => {
         appendChat('⏰ 제한시간이 초과되어 자동으로 패스 처리되었습니다.', false, true);
-        stopTurnCountdown();
+        turnEndTime = null;
+        updateTurnTimerUI();
       });
 
       // 게임 초기 설정 이벤트 핸들러
@@ -551,10 +601,10 @@
         console.log('현재 카드 선택 모드:', isCardSelectionMode);
         
         // 카드 선택 모드 중이면 gameSetup을 무시
-        // if (isCardSelectionMode) {
-        //   console.log('카드 선택 모드 중이므로 gameSetup을 무시합니다.');
-        //   return;
-        // }
+        if (isCardSelectionMode) {
+          console.log('카드 선택 모드 중이므로 gameSetup을 무시합니다.');
+          return;
+        }
         
         console.log('gameSetup 처리 시작');
         ordered = data.ordered;
@@ -611,9 +661,10 @@
           html += '<div id="handArea" style="display:flex;background:#eee;padding:10px;box-sizing:border-box;margin:0 auto 10px auto;overflow:visible;">';
           myCards.forEach((card, i) => {
             const isSelected = selected.includes(i);
-            html += `<div class="cardBtn" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''}">`;
-            html += `<div style="width:100px;height:200px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:5px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;">`;
-            html += `<div style="position:absolute;top:5px;left:5px;font-size:1.2em;font-weight:bold;">${card === 'J' ? '🃏' : card}</div>`;
+            html += `<div class="cardBtn" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''};position:relative;">`;
+            html += `<div style="width:100px;height:157px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:5px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;display:flex;align-items:center;justify-content:center;">`;
+            html += `<img src=\"${getCardImageSrc(card)}\" alt=\"${card}\" style=\"width:100%;height:100%;object-fit:contain;\">`;
+            html += `<div style=\"position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:1.7em;font-weight:bold;color:#111;text-shadow:0 0 6px #fff, 0 0 3px #fff, 0 0 1px #fff;pointer-events:none;\">${card === 'J' ? 'J' : card}</div>`;
             html += '</div>';
             html += '</div>';
           });
@@ -703,9 +754,10 @@
           html += '<div id="handArea" style="display:flex;background:#eee;padding:10px;box-sizing:border-box;margin:0 auto 10px auto;overflow:visible;">';
           myCards.forEach((card, i) => {
             const isSelected = selected.includes(i);
-            html += `<div class="cardBtn" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''}">`;
-            html += `<div style="width:100px;height:200px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:5px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;">`;
-            html += `<div style="position:absolute;top:5px;left:5px;font-size:1.2em;font-weight:bold;">${card === 'J' ? '🃏' : card}</div>`;
+            html += `<div class="cardBtn" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''};position:relative;">`;
+            html += `<div style="width:100px;height:157px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:5px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;display:flex;align-items:center;justify-content:center;">`;
+            html += `<img src=\"${getCardImageSrc(card)}\" alt=\"${card}\" style=\"width:100%;height:100%;object-fit:contain;\">`;
+            html += `<div style=\"position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:1.7em;font-weight:bold;color:#111;text-shadow:0 0 6px #fff, 0 0 3px #fff, 0 0 1px #fff;pointer-events:none;\">${card === 'J' ? 'J' : card}</div>`;
             html += '</div>';
             html += '</div>';
           });
@@ -851,51 +903,13 @@
         syncTurnTimer();
       });
 
-      // 카드 제출 결과
-      socket.on('playResult', (data) => {
-        console.log('카드 제출 결과:', data);
-        const player = ordered[data.playerIdx];
-        const cards = data.cards.map(c => c === 'J' ? '🃏' : c).join(' ');
 
-        // 필드 정보 업데이트
-        if (data.lastPlay) {
-          field = { ...data.lastPlay };
-        }
-
-        // 각 플레이어의 카드 수 업데이트
-        if (data.playerHands) {
-          ordered.forEach((p, i) => {
-            p.cardCount = data.playerHands[i];
-          });
-        }
-
-        // 내가 낸 카드면 손에서 제거
-        if (player.id === socket.id) {
-          data.cards.forEach(card => {
-            const index = myCards.indexOf(card);
-            if (index > -1) myCards.splice(index, 1);
-          });
-        }
-        
-        // 완주한 플레이어 체크
-        if (data.finished[data.playerIdx]) {
-          appendChat(`🏁 ${player.nickname}님이 완주했습니다!`, false, true);
-        }
-
-        appendChat(`🎴 ${player.nickname}님이 ${cards}를 냈습니다.`, false, true);
-        renderGame();
-        syncTurnTimer();
-      });
 
       // 패스 결과
       socket.on('passResult', (data) => {
         console.log('패스 결과:', data);
         const player = ordered[data.playerIdx];
-        let msg = `⏭️ ${player.nickname}님이 패스했습니다. (${data.passes}번째 패스)`;
-        if (data.passedNicknames && data.passedNicknames.length > 0) {
-          msg += `\n이번 라운드 패스: ${data.passedNicknames.join(', ')}`;
-        }
-        appendChat(msg, false, true);
+        appendChat(`⏭️ ${player.nickname}님이 패스했습니다. (${data.passes}번째 패스)`, false, true);
       });
 
       // 새로운 라운드 시작
@@ -919,18 +933,25 @@
         html += '<div style="text-align:center;margin-bottom:2em;">';
         html += '<h2>게임이 중단되었습니다</h2>';
         html += `<p style="color:#666;font-size:1.1em;">${data.message}</p>`;
-        html += '<p style="color:#888;">플레이어가 부족하여 게임을 계속할 수 없습니다.</p>';
-        html += '<p style="color:#f57c00;font-weight:bold;margin-top:1em;">💡 아래 "게임 나가기" 버튼을 클릭하여 로비로 돌아가주세요.</p>';
+        html += '<p style="color:#f57c00;font-weight:bold;margin-top:1em;">💡 상단의 "게임 나가기" 버튼을 클릭하여 로비로 돌아가주세요.</p>';
         html += '</div>';
         gameContent.innerHTML = html;
 
-        appendChat('⚠️ 게임이 중단되었습니다. 게임 나가기 버튼을 클릭하여 로비로 돌아가주세요.', false, true);
-        stopTurnCountdown();
+        appendChat('⚠️ 게임이 중단되었습니다. 상단의 게임 나가기 버튼을 클릭하여 로비로 돌아가주세요.', false, true);
       });
 
       // 게임 종료 및 점수
       socket.on('gameEnd', (result) => {
         console.log('게임 종료:', result);
+
+        // 게임 상태 변수들 초기화
+        myCards = [];
+        selected = [];
+        myIdx = null;
+        turnInfo = null;
+        field = null;
+        ordered = [];
+        isCardSelectionMode = false;
 
         const gameContent = document.getElementById('gameContent');
         if (!gameContent) return;
@@ -1012,7 +1033,12 @@
       if (leaveBtn) {
         leaveBtn.addEventListener('click', function() {
           if (confirm('정말 게임을 나가시겠습니까?')) {
+            console.log('게임 나가기 버튼 클릭됨');
             socket.emit('leaveGame');
+            // 버튼 비활성화하여 중복 클릭 방지
+            leaveBtn.disabled = true;
+            leaveBtn.textContent = '나가는 중...';
+            leaveBtn.style.background = '#ccc';
           }
         });
       }
@@ -1020,12 +1046,19 @@
       socket.on('resetClient', () => {
         localStorage.clear();
         sessionStorage.clear();
-        location.reload();
+        window.location.href = '/index.html';
       });
 
       socket.on('timerStatus', (data) => {
         console.log('[timerStatus] 이벤트 수신:', data, '-> timerEnabled:', data.enabled);
         timerEnabled = data.enabled;
+        updateTurnTimerUI();
+      });
+
+      socket.on('timerTimeChanged', (data) => {
+        console.log('[timerTimeChanged] 이벤트 수신:', data);
+        turnTimeSeconds = data.time;
+        // 타이머 시간이 변경되었을 때 UI 업데이트
         updateTurnTimerUI();
       });
 
@@ -1044,6 +1077,81 @@
         // body 스크롤 다시 허용
         document.body.style.overflow = '';
       };
+
+      socket.on('turnTimerStart', (data) => {
+        console.log('turnTimerStart 이벤트 수신:', data);
+        
+        // 서버에서 전송된 시작 시간과 종료 시간을 사용
+        if (data.startTime && data.endTime) {
+          const serverStartTime = data.startTime;
+          const now = Date.now();
+          
+          // 네트워크 지연을 보정하여 정확한 종료 시간 계산
+          const networkDelay = now - serverStartTime;
+          const correctedEndTime = data.endTime + networkDelay;
+          
+          turnEndTime = correctedEndTime;
+          turnTimeSeconds = data.turnTime || 30;
+          
+          console.log(`타이머 동기화: 서버시작=${serverStartTime}, 현재=${now}, 지연=${networkDelay}ms, 보정된종료시간=${correctedEndTime}`);
+        } else {
+          // fallback
+          console.log('startTime이 없어서 fallback 사용');
+          turnEndTime = data.endTime;
+          turnTimeSeconds = data.turnTime || 30;
+        }
+        startTurnCountdown();
+      });
+
+      // 혁명 선택 요청 이벤트
+      socket.on('revolutionChoice', (data) => {
+        console.log('=== revolutionChoice 이벤트 수신 ===', data);
+        isCardSelectionMode = true;
+        // 혁명 선택 모달 생성
+        const gameContent = document.getElementById('gameContent');
+        if (gameContent) {
+          let html = '<div style="text-align:center;margin:2em 0;">';
+          if (data && data.role && data.nickname) {
+            html += `<div style=\"font-size:1.1em;color:#333;margin-bottom:1em;\">당신은 <b>${data.role}</b> (${data.nickname}) 입니다.</div>`;
+          }
+          html += '<h2 style="color:#d32f2f;">🃏🃏 혁명 기회!</h2>';
+          html += '<p style="color:#444;font-size:1.1em;margin-bottom:2em;">조커 2장을 보유하셨습니다.<br>혁명을 선언하면 카드 교환 없이 바로 게임이 시작됩니다.<br>혁명을 선언하시겠습니까?</p>';
+          html += '<button id="revolutionYesBtn" style="padding:0.8em 2em;font-size:1.1em;background:#d32f2f;color:white;border:none;border-radius:8px;cursor:pointer;margin-right:1em;">혁명 선언</button>';
+          html += '<button id="revolutionNoBtn" style="padding:0.8em 2em;font-size:1.1em;background:#888;color:white;border:none;border-radius:8px;cursor:pointer;">혁명 안함</button>';
+          html += '</div>';
+          gameContent.innerHTML = html;
+          document.getElementById('revolutionYesBtn').onclick = function() {
+            socket.emit('revolutionResult', { revolution: true });
+            isCardSelectionMode = false;
+            gameContent.innerHTML = '<div style="text-align:center;margin:2em 0;"><h2 style="color:#d32f2f;">혁명 선언!</h2><p style="color:#444;">카드 교환 없이 게임이 곧 시작됩니다...</p></div>';
+          };
+          document.getElementById('revolutionNoBtn').onclick = function() {
+            socket.emit('revolutionResult', { revolution: false });
+            isCardSelectionMode = false;
+            gameContent.innerHTML = '<div style="text-align:center;margin:2em 0;"><h2 style="color:#888;">혁명 안함</h2><p style="color:#444;">카드 교환 단계로 진행합니다...</p></div>';
+          };
+        }
+      });
+
+
+
+      // 게임 시작 알림 (모든 라운드)
+      socket.on('gameStart', (data) => {
+        // 만약 현재 페이지가 game.html이 아니면 이동
+        if (!window.location.pathname.endsWith('game.html')) {
+          // roomId, nickname 쿼리스트링 유지
+          const params = new URLSearchParams(window.location.search);
+          window.location.href = '/game.html?' + params.toString();
+        } else {
+          // 혁명 선택이나 카드 교환이 필요한 경우 게임 화면을 렌더링하지 않음
+          if (data && (data.needRevolutionChoice || data.needCardExchange)) {
+            console.log('혁명 선택 또는 카드 교환이 필요하므로 게임 화면 렌더링을 건너뜁니다.');
+            return;
+          }
+          // 이미 game.html이면 새로고침 또는 render
+          renderGame();
+        }
+      });
     });
   </script>
 </body>
