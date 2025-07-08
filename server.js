@@ -188,6 +188,7 @@ function startGameIfReady(roomId) {
     rooms[roomId].game.passes = 0;
     rooms[roomId].game.finished = Array(rooms[roomId].game.ordered.length).fill(false);
     rooms[roomId].game.finishOrder = [];
+    rooms[socket.roomId].game.passedThisRound = Array(rooms[socket.roomId].game.ordered.length).fill(false);
     rooms[roomId].game.isFirstTurnOfRound = true; // 게임 시작 시 첫 턴 플래그 설정
     // gameCount, lastGameScores, totalScores는 게임이 완전히 끝날 때 초기화하거나 다음 라운드 시작 시 해야 함
 
