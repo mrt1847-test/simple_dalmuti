@@ -1026,35 +1026,22 @@ io.on('connection', (socket) => {
             });
           }
         });
-        // hand.length === 0 (마지막 카드로 1을 내서 완주)라면, 게임이 끝났는지 체크 후, 아니면 다음 미완주자에게 턴 넘기기
+        // hand.length === 0 (마지막 카드로 1을 내서 완주)라면, 게임이 끝났는지 체크 후, 종료면 return, 아니면 아래 공통 턴 넘김 로직으로 진행
         if (hand.length === 0) {
           const finishedCount = rooms[socket.roomId].game.finished.filter(f => f).length;
           if (finishedCount >= rooms[socket.roomId].players.length - 1) {
             // 게임 종료는 이미 위에서 처리됨
             return;
-          } else {
-            // 다음 미완주자에게 턴 넘기기
-            do {
-              rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
-            } while (
-              rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]
-            );
-            io.to(socket.roomId).emit('turnChanged', {
-              turnIdx: rooms[socket.roomId].game.turnIdx,
-              currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx],
-              isFirstTurnOfRound: false
-            });
-            startTurnTimer(socket.roomId);
-            cb && cb({success: true});
-            return;
           }
+          // else: 아래 공통 턴 넘김 로직으로 진행
         }
-        // 그 다음 미완주자에게 턴 넘기기 (hand가 남아있는 경우만)
+        // hand.length === 0에서 게임이 끝나지 않았거나, hand.length > 0인 경우 모두 여기서 턴 넘김
         do {
           rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
         } while (
           rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx] ||
-          rooms[socket.roomId].game.passedThisRound[rooms[socket.roomId].game.turnIdx]
+          rooms[socket.roomId].game.passedThisRound[rooms[socket.roomId].game.turnIdx] ||
+          rooms[socket.roomId].game.turnIdx === idx // 방금 완주한 본인도 건너뜀
         );
         io.to(socket.roomId).emit('turnChanged', {
           turnIdx: rooms[socket.roomId].game.turnIdx,
