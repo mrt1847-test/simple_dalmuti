@@ -268,6 +268,8 @@ function startGameIfReady(roomId) {
     const joker2Idx = hands.findIndex(hand => hand.filter(c => c === 'J').length === 2);
     console.log(`혁명 기회 체크 - 조커 2장 보유자 인덱스: ${joker2Idx}`);
     if (joker2Idx !== -1) {
+      rooms[roomId].game.revolutionPending = true; // 혁명 대기 상태 시작
+      console.log('[revolutionPending] 혁명 선택 대기 상태 진입');
       console.log('🎯 혁명 기회 발견! 조커 2장 보유자:', rooms[roomId].game.ordered[joker2Idx].nickname);
       // 혁명 선택이 필요한 경우 gameStart 이벤트를 보내지 않음
       // 클라이언트들에게 게임 페이지로 이동하라고 알림 (혁명 선택용)
@@ -303,7 +305,6 @@ function startGameIfReady(roomId) {
           }
         });
       }, 5000);
-      // 혁명 선택 결과를 기다림 (아래에 revolutionResult 핸들러 추가 필요)
       return;
     }
     // 혁명 기회가 없으면 기존 카드 교환 단계로 진행
@@ -1421,6 +1422,8 @@ io.on('connection', (socket) => {
       return;
     }
     
+    rooms[roomId].game.revolutionPending = false; // 혁명 대기 상태 해제
+    console.log('[revolutionPending] 혁명 선택 대기 상태 해제');
     console.log(`현재 방 플레이어 수: ${rooms[roomId].players.length}`);
     console.log(`게임 진행 중: ${rooms[roomId].game.inProgress}`);
     console.log(`카드 교환 진행 중: ${rooms[roomId].game.cardExchangeInProgress}`);
