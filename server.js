@@ -510,6 +510,7 @@ function startTurnTimer(roomId) {
   });
   room.turnTimer = setTimeout(() => {
     const currentPlayer = room.game.ordered[room.game.turnIdx];
+    if (!currentPlayer) return; // 방어 코드 추가
     if (!room.game.finished[room.game.turnIdx]) {
       io.to(roomId).emit('turnTimeout'); // 클라이언트에 알림
       // 서버에서 자동 패스 처리
@@ -1411,7 +1412,7 @@ io.on('connection', (socket) => {
       // 혁명 발생: 카드 교환 없이 바로 게임 시작
       console.log('🔥 혁명 선언됨! 카드 교환 없이 게임 시작');
       io.to(roomId).emit('chat', { nickname: 'SYSTEM', msg: '혁명 발생! 카드 교환 없이 게임이 시작됩니다.' });
-      // 클라이언트들이 준비될 시간을 주고 게임 시작
+      // 클라이언트들에게 안내 메시지 후 2초 대기 후 게임 시작
       setTimeout(() => {
         console.log('🚀 혁명 후 게임 시작 함수 호출');
         try {
@@ -1419,7 +1420,7 @@ io.on('connection', (socket) => {
         } catch (error) {
           console.error('❌ 혁명 후 게임 시작 중 오류 발생:', error);
         }
-      }, 1000);
+      }, 2000);
     } else {
       // 기존 카드 교환 단계로 진행 (기존 코드 복사)
       const dalmutiIdx = rooms[roomId].game.ordered.findIndex(p => p.role === '달무티');
