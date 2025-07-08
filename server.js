@@ -188,7 +188,6 @@ function startGameIfReady(roomId) {
     rooms[roomId].game.passes = 0;
     rooms[roomId].game.finished = Array(rooms[roomId].game.ordered.length).fill(false);
     rooms[roomId].game.finishOrder = [];
-    rooms[socket.roomId].game.passedThisRound = Array(rooms[socket.roomId].game.ordered.length).fill(false);
     rooms[roomId].game.isFirstTurnOfRound = true; // 게임 시작 시 첫 턴 플래그 설정
     // gameCount, lastGameScores, totalScores는 게임이 완전히 끝날 때 초기화하거나 다음 라운드 시작 시 해야 함
 
@@ -928,6 +927,7 @@ io.on('connection', (socket) => {
     // 카드 제출 후 손패 정렬
     hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b));
     rooms[socket.roomId].game.lastPlay = {count: cards.length, number: num, playerIdx: idx, cards: [...cards]};
+    // rooms[socket.roomId].game.passedThisRound = Array(rooms[socket.roomId].game.ordered.length).fill(false); // <--- 카드 내면 패스상태 초기화
     rooms[socket.roomId].game.passes = 0;
     rooms[socket.roomId].game.isFirstTurnOfRound = false; // 카드를 내면 첫 턴 플래그 해제
     // 디버그: 턴/패스 상태 출력
@@ -945,13 +945,20 @@ io.on('connection', (socket) => {
       const activeIdxs = rooms[socket.roomId].game.ordered.map((p, i) => i).filter(i => i !== idx && !rooms[socket.roomId].game.finished[i]);
       activeIdxs.forEach(i => {
         rooms[socket.roomId].game.passedThisRound[i] = true; // <--- 1을 내면 나머지 미완주자 모두 패스 처리
+        // io.to(socket.roomId).emit('passResult', {playerIdx: i, passes: null}); // <--- passResult emit 제거
       });
-      // 1을 낸 플레이어의 게임 완주 처리 (do-while 전에 무조건 처리)
-      if (hand.length === 0 && !rooms[socket.roomId].game.finished[idx]) {
-        rooms[socket.roomId].game.finished[idx] = true;
-        rooms[socket.roomId].game.finishOrder.push(idx);
-        console.log(`*** ${rooms[socket.roomId].game.ordered[idx].nickname} has finished with 1! ***`);
+      
+      // 1을 낸 플레이어의 게임 완주 처리
+      let justFinished = false;
+      if (hand.length === 0) {
+        if (!rooms[socket.roomId].game.finished[idx]) {
+          rooms[socket.roomId].game.finished[idx] = true;
+          rooms[socket.roomId].game.finishOrder.push(idx);
+          justFinished = true;
+          console.log(`*** ${rooms[socket.roomId].game.ordered[idx].nickname} has finished with 1! ***`);
+        }
       }
+      
       // 게임 종료 체크
       const finishedCount = rooms[socket.roomId].game.finished.filter(f => f).length;
       if (finishedCount >= rooms[socket.roomId].players.length - 1) {
@@ -998,25 +1005,177 @@ io.on('connection', (socket) => {
           rooms[socket.roomId].game.playerHands = [];
           rooms[socket.roomId].game.finished = [];
           rooms[socket.roomId].game.finishOrder = [];
-          rooms[socket.roomId].game.gameCount = (rooms[socket.roomId].game.gameCount || 1) + 1; // 게임 횟수 증가
-          // lastGameScores, totalScores는 유지
-
+          rooms[socket.roomId].game.gameCount = (rooms[socket.roomId].game.gameCount || 1) + 1;
           startGameIfReady(socket.roomId);
         }, 5000);
         return;
       }
       
-      // 다음 턴
-      do {
-        rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
-      } while (
-        rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx] ||
-        rooms[socket.roomId].game.passedThisRound[rooms[socket.roomId].game.turnIdx] ||
-        rooms[socket.roomId].game.turnIdx === idx // 방금 낸 본인도 건너뜀
-      );
-      io.to(socket.roomId).emit('turnChanged', { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: false });
-      startTurnTimer(socket.roomId);
+      if (justFinished) {
+        // 완주한 경우: playResult를 한 번 더 보내서 클라가 완주자임을 인지하게 함
+        rooms[socket.roomId].game.ordered.forEach((p, i) => {
+          const targetSocket = io.sockets.sockets.get(p.id);
+          if (targetSocket) {
+            targetSocket.emit('playResult', {
+              playerIdx: idx,
+              cards,
+              lastPlay: {count: cards.length, number: num, playerIdx: idx, cards: [...cards]},
+              finished: rooms[socket.roomId].game.finished,
+              playerHands: rooms[socket.roomId].game.playerHands.map(hand => hand.length),
+              myCards: rooms[socket.roomId].game.playerHands[i]
+            });
+          }
+        });
+        // 만약 hand.length === 0 (즉, 마지막 카드로 1을 내서 완주)라면, 턴을 넘기지 않고 리턴
+        if (hand.length === 0) {
+          // 게임 종료 체크는 이미 위에서 처리됨
+          return;
+        }
+        // 그 다음 미완주자에게 턴 넘기기 (hand가 남아있는 경우만)
+        do {
+          rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
+        } while (
+          rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx] ||
+          rooms[socket.roomId].game.passedThisRound[rooms[socket.roomId].game.turnIdx]
+        );
+        io.to(socket.roomId).emit('turnChanged', {
+          turnIdx: rooms[socket.roomId].game.turnIdx,
+          currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx],
+          isFirstTurnOfRound: false
+        });
+        startTurnTimer(socket.roomId);
+        cb && cb({success: true});
+        return;
+      }
+      // 완주가 아니라면 기존대로 라운드 리셋
+      rooms[socket.roomId].game.passes = 0;
+      rooms[socket.roomId].game.turnIdx = idx;
+      rooms[socket.roomId].game.lastPlay = null;
+      rooms[socket.roomId].game.isFirstTurnOfRound = true; // 1을 내서 새로운 라운드 시작 시 첫 턴 플래그 설정
+      setTimeout(() => {
+        rooms[socket.roomId].game.passedThisRound = Array(rooms[socket.roomId].game.ordered.length).fill(false);
+        io.to(socket.roomId).emit('newRound', {turnIdx: rooms[socket.roomId].game.turnIdx, lastPlay: null, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: true});
+        startTurnTimer(socket.roomId);
+      }, 400);
+      clearTurnTimer(socket.roomId);
+      rooms[socket.roomId].game.ordered.forEach((p, i) => {
+        const targetSocket = io.sockets.sockets.get(p.id);
+        if (targetSocket) {
+          targetSocket.emit('playResult', {
+            playerIdx: idx,
+            cards,
+            lastPlay: {count: cards.length, number: num, playerIdx: idx, cards: [...cards]},
+            finished: rooms[socket.roomId].game.finished,
+            playerHands: rooms[socket.roomId].game.playerHands.map(hand => hand.length),
+            myCards: rooms[socket.roomId].game.playerHands[i]
+          });
+        }
+      });
+      cb && cb({success: true});
+      return;
     }
+
+    console.log(`Hand of ${rooms[socket.roomId].game.ordered[idx].nickname} AFTER play: ${hand.length} cards`);
+    console.log('All hands AFTER play:', JSON.stringify(rooms[socket.roomId].game.playerHands.map(h => h.length)));
+    
+    if (hand.length === 0) {
+      if (!rooms[socket.roomId].game.finished[idx]) {
+        rooms[socket.roomId].game.finished[idx] = true;
+        rooms[socket.roomId].game.finishOrder.push(idx);
+        console.log(`*** ${rooms[socket.roomId].game.ordered[idx].nickname} has finished! ***`);
+      }
+    }
+
+    console.log('`finished` array state:', JSON.stringify(rooms[socket.roomId].game.finished));
+    
+    clearTurnTimer(socket.roomId);
+    rooms[socket.roomId].game.ordered.forEach((p, i) => {
+      const targetSocket = io.sockets.sockets.get(p.id);
+      if (targetSocket) {
+        targetSocket.emit('playResult', {
+          playerIdx: idx,
+          cards,
+          lastPlay: rooms[socket.roomId].game.lastPlay,
+          finished: rooms[socket.roomId].game.finished,
+          playerHands: rooms[socket.roomId].game.playerHands.map(hand => hand.length),
+          myCards: rooms[socket.roomId].game.playerHands[i]
+        });
+      }
+    });
+    cb && cb({success: true});
+
+    // 게임 종료 체크
+    const finishedCount = rooms[socket.roomId].game.finished.filter(f => f).length;
+    console.log(`게임 진행 상황: ${finishedCount}/${rooms[socket.roomId].players.length} 완주`);
+    
+    if (finishedCount >= rooms[socket.roomId].players.length - 1) { // 한 명만 남으면 게임 종료
+      // 남은 한 명 자동 꼴찌 처리
+      const lastIdx = rooms[socket.roomId].game.finished.findIndex(f => !f);
+      if (lastIdx !== -1) {
+        rooms[socket.roomId].game.finished[lastIdx] = true;
+        rooms[socket.roomId].game.finishOrder.push(lastIdx);
+      }
+      console.log('모든 플레이어가 완주했습니다! 게임 종료.');
+      
+      // 인원에 따른 점수 배정
+      let scores;
+      if (rooms[socket.roomId].players.length === 4) {
+        scores = [10, 8, 6, 4];
+      } else if (rooms[socket.roomId].players.length === 5) {
+        scores = [10, 8, 6, 5, 4];
+      } else if (rooms[socket.roomId].players.length === 6) {
+        scores = [10, 8, 6, 5, 4, 3];
+      } else if (rooms[socket.roomId].players.length === 7) {
+        scores = [10, 8, 6, 5, 4, 3, 2];
+      } else if (rooms[socket.roomId].players.length === 8) {
+        scores = [10, 8, 6, 5, 4, 3, 2, 1];
+      }
+      const result = rooms[socket.roomId].game.finishOrder.map((playerIdx, i) => {
+        const nickname = rooms[socket.roomId].game.ordered[playerIdx].nickname;
+        const role = rooms[socket.roomId].game.ordered[playerIdx].role;
+        const score = scores[i] || 0;
+        rooms[socket.roomId].game.lastGameScores[nickname] = score;
+        rooms[socket.roomId].game.totalScores[nickname] = (rooms[socket.roomId].game.totalScores[nickname] || 0) + score;
+        return {
+          nickname,
+          role,
+          score,
+          total: rooms[socket.roomId].game.totalScores[nickname]
+        }
+      });
+      
+      console.log('게임 종료! 최종 결과:', result);
+      io.to(socket.roomId).emit('gameEnd', result);
+      
+      // 5초 후 자동으로 다음 게임 시작
+      setTimeout(() => {
+        // 게임 상태만 리셋 (점수, totalScores 등은 유지)
+        rooms[socket.roomId].game.inProgress = false;
+        rooms[socket.roomId].game.ordered = [];
+        rooms[socket.roomId].game.turnIdx = 0;
+        rooms[socket.roomId].game.lastPlay = null;
+        rooms[socket.roomId].game.passes = 0;
+        rooms[socket.roomId].game.playerHands = [];
+        rooms[socket.roomId].game.finished = [];
+        rooms[socket.roomId].game.finishOrder = [];
+        rooms[socket.roomId].game.gameCount = (rooms[socket.roomId].game.gameCount || 1) + 1; // 게임 횟수 증가
+        // lastGameScores, totalScores는 유지
+
+        startGameIfReady(socket.roomId);
+      }, 5000);
+      return;
+    }
+    
+    // 다음 턴
+    do {
+      rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
+    } while (
+      rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx] ||
+      rooms[socket.roomId].game.passedThisRound[rooms[socket.roomId].game.turnIdx]
+    );
+    
+    io.to(socket.roomId).emit('turnChanged', { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: false });
+    startTurnTimer(socket.roomId);
   });
   
   socket.on('passTurn', (cb) => {
