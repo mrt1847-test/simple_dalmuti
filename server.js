@@ -1026,7 +1026,12 @@ io.on('connection', (socket) => {
             });
           }
         });
-        // 그 다음 미완주자에게 턴 넘기기
+        // 만약 hand.length === 0 (즉, 마지막 카드로 1을 내서 완주)라면, 턴을 넘기지 않고 리턴
+        if (hand.length === 0) {
+          // 게임 종료 체크는 이미 위에서 처리됨
+          return;
+        }
+        // 그 다음 미완주자에게 턴 넘기기 (hand가 남아있는 경우만)
         do {
           rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
         } while (
