@@ -1,4 +1,3 @@
-
 const http = require('http');
 const express = require('express');
 const { Server } = require('socket.io');
@@ -1114,39 +1113,33 @@ io.on('connection', (socket) => {
     }
     
     clearTurnTimer(socket.roomId);
-    rooms[socket.roomId].game.passes++;
-    io.to(socket.roomId).emit('passResult', {playerIdx: idx, passes: rooms[socket.roomId].game.passes});
+    rooms[socket.roomId].game.passedThisRound[idx] = true; // <--- 패스한 플레이어 표시
+    io.to(socket.roomId).emit('passResult', {playerIdx: idx, passes: null});
 
-    console.log(`\n--- [passTurn] Event from ${rooms[socket.roomId].game.ordered[idx].nickname} (idx: ${idx}) ---`);
-    console.log(`Current passes: ${rooms[socket.roomId].game.passes}`);
-    
-    // 현재 게임에 참여 중인(완주하지 않은) 플레이어 수 계산
+    // 라운드 종료 조건: 마지막 낸 사람을 제외한 미완주자 모두 패스?
+    const lastPlayIdx = rooms[socket.roomId].game.lastPlay ? rooms[socket.roomId].game.lastPlay.playerIdx : null;
+    const activeIdxs = rooms[socket.roomId].game.ordered.map((p, i) => i)
+      .filter(i => i !== lastPlayIdx && !rooms[socket.roomId].game.finished[i]);
+    const allPassed = activeIdxs.every(i => rooms[socket.roomId].game.passedThisRound[i]);
     const activePlayersCount = rooms[socket.roomId].players.length - rooms[socket.roomId].game.finished.filter(f => f).length;
-    console.log(`Active players: ${activePlayersCount}`);
 
-    // 모두 패스 -> 라운드 리셋
-    // 플레이어가 1명만 남은 경우는 패스하지 않고 카드를 내야 함
-    if (rooms[socket.roomId].game.passes >= activePlayersCount-1 && activePlayersCount > 1) {
-      console.log('*** All active players have passed. Starting a new round. ***');
-      rooms[socket.roomId].game.passes = 0;
-      // 마지막으로 카드를 낸 사람이 턴을 잡음
+    if (allPassed && activePlayersCount > 1) {
+      // 라운드 리셋
+      rooms[socket.roomId].game.passedThisRound = Array(rooms[socket.roomId].game.ordered.length).fill(false);
       if (rooms[socket.roomId].game.lastPlay) {
         rooms[socket.roomId].game.turnIdx = rooms[socket.roomId].game.lastPlay.playerIdx;
-        // 마지막으로 카드를 낸 사람이 이미 완료했다면, 다음 완료하지 않은 플레이어에게 턴을 넘김
         if (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]) {
           do {
             rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
           } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]);
         }
       }
-      // lastPlay가 null이면 (라운드 첫 턴에 모두 패스하는 비정상적 상황) 현재 턴 유지
       rooms[socket.roomId].game.lastPlay = null;
-      rooms[socket.roomId].game.isFirstTurnOfRound = true; // 새로운 라운드 시작 시 첫 턴 플래그 설정
+      rooms[socket.roomId].game.isFirstTurnOfRound = true;
       io.to(socket.roomId).emit('newRound', {turnIdx: rooms[socket.roomId].game.turnIdx, lastPlay: null, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: true});
       startTurnTimer(socket.roomId);
     } else if (activePlayersCount === 1) {
       // 플레이어가 1명만 남은 경우, 패스할 수 없고 카드를 내야 함
-      console.log('*** Only one player remaining. Must play cards. ***');
       // 패스 처리는 하지 않고 턴을 그대로 유지
     } else {
       // 다음 턴: finished 또는 passedThisRound가 true인 플레이어는 건너뜀
