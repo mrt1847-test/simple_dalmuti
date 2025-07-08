@@ -899,7 +899,7 @@ io.on('connection', (socket) => {
     // 카드 제출 후 손패 정렬
     hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b));
     rooms[socket.roomId].game.lastPlay = {count: cards.length, number: num, playerIdx: idx, cards: [...cards]};
-    rooms[socket.roomId].game.passedThisRound = Array(rooms[socket.roomId].game.ordered.length).fill(false); // <--- 카드 내면 패스상태 초기화
+    // rooms[socket.roomId].game.passedThisRound = Array(rooms[socket.roomId].game.ordered.length).fill(false); // <--- 카드 내면 패스상태 초기화
     rooms[socket.roomId].game.passes = 0;
     rooms[socket.roomId].game.isFirstTurnOfRound = false; // 카드를 내면 첫 턴 플래그 해제
     // 디버그: 턴/패스 상태 출력
@@ -1178,7 +1178,13 @@ io.on('connection', (socket) => {
     if (allPassed && activePlayersCount > 1) {
       // 라운드 리셋
       rooms[socket.roomId].game.passedThisRound = Array(rooms[socket.roomId].game.ordered.length).fill(false);
-      // turnIdx 보정 do-while문 제거 (중복 증가 방지)
+      // newRound emit 직전 반드시 보정
+      do {
+        rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
+      } while (
+        rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx] ||
+        rooms[socket.roomId].game.passedThisRound[rooms[socket.roomId].game.turnIdx]
+      );
       // 디버그: 라운드 리셋 직후 상태 출력
       console.log('[passTurn] round reset:', {
         turnIdx: rooms[socket.roomId].game.turnIdx,
