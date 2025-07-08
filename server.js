@@ -198,11 +198,21 @@ function startGameIfReady(roomId) {
     }
     deck.push('J', 'J');
 
-    for (let i = deck.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [deck[i], deck[j]] = [deck[j], deck[i]];
+    // [테스트 모드] 닉네임이 'test'인 플레이어가 있으면 조커 2장 강제 배분
+    const testIdx = rooms[roomId].game.ordered.findIndex(p => p.nickname === 'test');
+    let jokers = [];
+    if (testIdx !== -1) {
+      jokers = ['J', 'J'];
+      // deck에서 조커 2장 제거
+      let removed = 0;
+      for (let i = deck.length - 1; i >= 0 && removed < 2; i--) {
+        if (deck[i] === 'J') {
+          deck.splice(i, 1);
+          removed++;
+        }
+      }
     }
-    
+
     const hands = Array(rooms[roomId].game.ordered.length).fill(null).map(() => []);
     let cardDealIndex = 0;
     
@@ -228,12 +238,18 @@ function startGameIfReady(roomId) {
     // 기본 카드 분배 (라운드-로빈 방식)
     for (let i = 0; i < baseCards; i++) {
       for (let j = 0; j < rooms[roomId].game.ordered.length; j++) {
+        // testIdx는 마지막 2장은 건너뜀
+        if (testIdx !== -1 && j === testIdx && hands[testIdx].length >= baseCards - 2) continue;
         if(deck[cardDealIndex]) {
           hands[j].push(deck[cardDealIndex++]);
         }
       }
     }
-
+    // testIdx에게 조커 2장 추가
+    if (testIdx !== -1) {
+      hands[testIdx].push('J', 'J');
+    }
+    
     // 달무티에게 추가 카드 분배
     const dalmutiIdx = rooms[roomId].game.ordered.findIndex(p => p.role === '달무티');
     if (dalmutiIdx !== -1 && dalmutiExtraCards > 0) {
