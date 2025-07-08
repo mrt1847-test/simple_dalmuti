@@ -1006,22 +1006,14 @@ io.on('connection', (socket) => {
         return;
       }
       // hand.length === 0에서 return하지 않고, 아래 턴 넘김(for문) 실행
-      let found = false;
-      for (let i = 0; i < rooms[socket.roomId].game.ordered.length; i++) {
+      do {
         rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
-        if (
-          !rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx] &&
-          !rooms[socket.roomId].game.passedThisRound[rooms[socket.roomId].game.turnIdx] &&
-          rooms[socket.roomId].game.turnIdx !== idx
-        ) {
-          found = true;
-          break;
-        }
-      }
-      if (found) {
-        io.to(socket.roomId).emit('turnChanged', { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: false });
-        startTurnTimer(socket.roomId);
-      }
+      } while (
+        rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]
+      );
+      
+      io.to(socket.roomId).emit('turnChanged', { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: false });
+      startTurnTimer(socket.roomId);
       return;
     }
 
