@@ -274,6 +274,10 @@ function startGameIfReady(roomId) {
       io.to(roomId).emit('gameStart', { needRevolutionChoice: true });
       console.log('혁명 기회! gameStart 이벤트 전송 (혁명 선택용). 클라이언트들이 game.html로 이동합니다.');
       setTimeout(() => {
+        if (!rooms[roomId].game.revolutionPending) {
+          console.log('[revolutionChoice emit] 혁명 대기 상태가 아님. emit 생략');
+          return;
+        }
         console.log('⏰ 혁명 선택 요청 시작');
         const revPlayer = rooms[roomId].game.ordered[joker2Idx];
         console.log(`혁명 선택 요청 대상: ${revPlayer.nickname} (${revPlayer.id})`);
@@ -1416,6 +1420,10 @@ io.on('connection', (socket) => {
   // 혁명 선택 결과 핸들러
   socket.on('revolutionResult', ({ revolution }) => {
     const roomId = socket.roomId;
+    if (rooms[roomId] && rooms[roomId].game) {
+      rooms[roomId].game.revolutionPending = false;
+      console.log('[revolutionPending] 혁명 선택 대기 상태 해제');
+    }
     console.log('=== revolutionResult 이벤트 수신 ===');
     console.log(`요청한 소켓 ID: ${socket.id}`);
     console.log(`혁명 선언 여부: ${revolution}`);
