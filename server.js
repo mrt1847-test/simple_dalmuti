@@ -991,7 +991,10 @@ io.on('connection', (socket) => {
         // 그 다음 미완주자에게 턴 넘기기
         do {
           rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
-        } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]);
+        } while (
+          rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx] ||
+          rooms[socket.roomId].game.passedThisRound[rooms[socket.roomId].game.turnIdx]
+        );
         io.to(socket.roomId).emit('turnChanged', {
           turnIdx: rooms[socket.roomId].game.turnIdx,
           currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx],
@@ -1122,7 +1125,10 @@ io.on('connection', (socket) => {
     // 다음 턴
     do {
       rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
-    } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx] || rooms[socket.roomId].game.passedThisRound[rooms[socket.roomId].game.turnIdx]);
+    } while (
+      rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx] ||
+      rooms[socket.roomId].game.passedThisRound[rooms[socket.roomId].game.turnIdx]
+    );
     
     io.to(socket.roomId).emit('turnChanged', { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: false });
     startTurnTimer(socket.roomId);
@@ -1189,7 +1195,10 @@ io.on('connection', (socket) => {
       // 다음 턴: finished 또는 passedThisRound가 true인 플레이어는 건너뜀
       do {
         rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
-      } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx] || rooms[socket.roomId].game.passedThisRound[rooms[socket.roomId].game.turnIdx]);
+      } while (
+        rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx] ||
+        rooms[socket.roomId].game.passedThisRound[rooms[socket.roomId].game.turnIdx]
+      );
       // 디버그: 턴 이동 후 상태 출력
       console.log('[playCards] next turn:', {
         turnIdx: rooms[socket.roomId].game.turnIdx,
