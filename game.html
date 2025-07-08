@@ -378,8 +378,8 @@
             if (field.cards && Array.isArray(field.cards)) {
               field.cards.forEach((card, i) => {
                 html += `<div style=\"overflow:visible;width:20px;flex-grow:1;${i === field.cards.length - 1 ? 'width:80px;flex-grow:0;' : ''};position:relative;\">`;
-                html += `<div style=\"width:80px;height:126px;background:#fffbe6;border:4px solid #bdb76b;box-shadow:-3px 0px 8px rgba(0,0,0,0.4);box-sizing:border-box;position:relative;border-radius:6px;display:flex;align-items:center;justify-content:center;\">`;
-                html += `<img src=\"${getCardImageSrc(card)}\" alt=\"${card}\" style=\"width:100%;height:100%;object-fit:contain;\">`;
+                html += `<div style=\"width:80px;height:126px;background:#fffbe6;border:3px solid #bdb76b;box-shadow:-3px 0px 8px rgba(0,0,0,0.4);box-sizing:border-box;position:relative;border-radius:6px;display:flex;align-items:center;justify-content:center;\">`;
+                html += `<img src=\"${getCardImageSrc(card)}\" alt=\"${card}\" style=\"width:100%;height:100%;object-fit:contain;opacity:0.85;\">`;
                 html += `<div style=\"position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:1.7em;font-weight:bold;color:#111;text-shadow:0 0 6px #fff, 0 0 3px #fff, 0 0 1px #fff;pointer-events:none;\">${card === 'J' ? 'J' : card}</div>`;
                 html += '</div>';
                 html += '</div>';
@@ -387,8 +387,8 @@
             } else {
               for (let i = 0; i < field.count; i++) {
                 html += `<div style=\"overflow:visible;width:20px;flex-grow:1;${i === field.count - 1 ? 'width:80px;flex-grow:0;' : ''};position:relative;\">`;
-                html += `<div style=\"width:80px;height:126px;background:#fffbe6;border:4px solid #bdb76b;box-shadow:-3px 0px 8px rgba(0,0,0,0.4);box-sizing:border-box;position:relative;border-radius:6px;display:flex;align-items:center;justify-content:center;\">`;
-                html += `<img src=\"${getCardImageSrc(field.number)}\" alt=\"${field.number}\" style=\"width:100%;height:100%;object-fit:contain;\">`;
+                html += `<div style=\"width:80px;height:126px;background:#fffbe6;border:3px solid #bdb76b;box-shadow:-3px 0px 8px rgba(0,0,0,0.4);box-sizing:border-box;position:relative;border-radius:6px;display:flex;align-items:center;justify-content:center;\">`;
+                html += `<img src=\"${getCardImageSrc(field.number)}\" alt=\"${field.number}\" style=\"width:100%;height:100%;object-fit:contain;opacity:0.85;\">`;
                 html += `<div style=\"position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:1.7em;font-weight:bold;color:#111;text-shadow:0 0 6px #fff, 0 0 3px #fff, 0 0 1px #fff;pointer-events:none;\">${field.number === 'J' ? 'J' : field.number}</div>`;
                 html += '</div>';
                 html += '</div>';
@@ -436,15 +436,15 @@
           myCards.forEach((card, i) => {
             const isSelected = selected.includes(i);
             html += `<div class="cardBtn" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''};position:relative;">`;
-            html += `<div style="width:100px;height:157px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:5px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;display:flex;align-items:center;justify-content:center;">`;
-            html += `<img src=\"${getCardImageSrc(card)}\" alt=\"${card}\" style=\"width:100%;height:100%;object-fit:contain;\">`;
+            html += `<div style="width:100px;height:157px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:3px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;display:flex;align-items:center;justify-content:center;">`;
+            html += `<img src=\"${getCardImageSrc(card)}\" alt=\"${card}\" style=\"width:100%;height:100%;object-fit:contain;opacity:0.85;\">`;
             html += `<div style=\"position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:1.7em;font-weight:bold;color:#111;text-shadow:0 0 6px #fff, 0 0 3px #fff, 0 0 1px #fff;pointer-events:none;\">${card === 'J' ? 'J' : card}</div>`;
             html += '</div>';
             html += '</div>';
           });
           html += '</div>';
           html += '<div style="text-align:center;margin-top:1.5em;">';
-          html += '<button id="submitBtn" style="padding:0.7em 2em;font-size:1.1em;margin-right:1em;">제출</button>';
+          html += '<button id="submitBtn" style="padding:0.7em 2em;font-size:1.1em;margin-right:1em;border-radius:10px;font-weight:bold;">제출</button>';
           
           // 마지막 플레이어가 남았는지 확인
           const activePlayers = ordered.filter(p => !p.finished).length;
@@ -452,11 +452,11 @@
           const isMyTurn = turnInfo && turnInfo.currentPlayer && turnInfo.currentPlayer.id === socket.id;
           
           if (activePlayers > 1 && !(isFirstTurn && isMyTurn)) {
-            html += '<button id="passBtn" style="padding:0.7em 2em;font-size:1.1em;">패스</button>';
+            html += '<button id="passBtn" style="padding:0.7em 2em;font-size:1.1em;border-radius:10px;font-weight:bold;">패스</button>';
           } else if (isFirstTurn && isMyTurn) {
-            html += '<button id="passBtn" style="padding:0.7em 2em;font-size:1.1em;background:#ffcdd2;color:#c62828;cursor:not-allowed;" disabled>첫 턴 패스 불가</button>';
+            html += '<button id="passBtn" style="padding:0.7em 2em;font-size:1.1em;background:#ffcdd2;color:#c62828;cursor:not-allowed;" disabled border-radius:10px;font-weight:bold;">첫 턴 패스 불가</button>';
           } else {
-            html += '<button id="passBtn" style="padding:0.7em 2em;font-size:1.1em;background:#ccc;color:#666;cursor:not-allowed;" disabled>패스 불가</button>';
+            html += '<button id="passBtn" style="padding:0.7em 2em;font-size:1.1em;background:#ccc;color:#666;cursor:not-allowed;" disabled border-radius:10px;font-weight:bold;">패스 불가</button>';
           }
           html += '</div>';
           html += '</div>';
@@ -662,8 +662,8 @@
           myCards.forEach((card, i) => {
             const isSelected = selected.includes(i);
             html += `<div class="cardBtn" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''};position:relative;">`;
-            html += `<div style="width:100px;height:157px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:5px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;display:flex;align-items:center;justify-content:center;">`;
-            html += `<img src=\"${getCardImageSrc(card)}\" alt=\"${card}\" style=\"width:100%;height:100%;object-fit:contain;\">`;
+            html += `<div style="width:100px;height:157px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:3px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;display:flex;align-items:center;justify-content:center;">`;
+            html += `<img src=\"${getCardImageSrc(card)}\" alt=\"${card}\" style=\"width:100%;height:100%;object-fit:contain;opacity:0.85;\">`;
             html += `<div style=\"position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:1.7em;font-weight:bold;color:#111;text-shadow:0 0 6px #fff, 0 0 3px #fff, 0 0 1px #fff;pointer-events:none;\">${card === 'J' ? 'J' : card}</div>`;
             html += '</div>';
             html += '</div>';
@@ -755,8 +755,8 @@
           myCards.forEach((card, i) => {
             const isSelected = selected.includes(i);
             html += `<div class="cardBtn" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''};position:relative;">`;
-            html += `<div style="width:100px;height:157px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:5px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;display:flex;align-items:center;justify-content:center;">`;
-            html += `<img src=\"${getCardImageSrc(card)}\" alt=\"${card}\" style=\"width:100%;height:100%;object-fit:contain;\">`;
+            html += `<div style="width:100px;height:157px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:3px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;display:flex;align-items:center;justify-content:center;">`;
+            html += `<img src=\"${getCardImageSrc(card)}\" alt=\"${card}\" style=\"width:100%;height:100%;object-fit:contain;opacity:0.85;\">`;
             html += `<div style=\"position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:1.7em;font-weight:bold;color:#111;text-shadow:0 0 6px #fff, 0 0 3px #fff, 0 0 1px #fff;pointer-events:none;\">${card === 'J' ? 'J' : card}</div>`;
             html += '</div>';
             html += '</div>';
