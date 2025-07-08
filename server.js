@@ -99,6 +99,7 @@ function resetGame(roomId) {
     playerHands: [],
     finished: [],
     finishOrder: [],
+    passedThisRound: [], // <--- 추가
     gameCount: 1,
     lastGameScores: {}, // { nickname: score }
     totalScores: {},    // { nickname: totalScore }
@@ -530,12 +531,16 @@ function autoPassTurn(roomId, socketId) {
   // 타임오버로 인한 자동 패스는 첫 턴이라도 허용
   console.log(`\n--- [autoPassTurn] ${rooms[roomId].game.ordered[idx].nickname}이 타임오버로 자동 패스됨 (첫 턴 여부: ${rooms[roomId].game.isFirstTurnOfRound}) ---`);
   
-  rooms[roomId].game.passes++;
-  io.to(roomId).emit('passResult', {playerIdx: idx, passes: rooms[roomId].game.passes});
-  // 현재 게임에 참여 중인(완주하지 않은) 플레이어 수 계산
+  rooms[roomId].game.passedThisRound[idx] = true; // <--- 자동 패스도 표시
+  io.to(roomId).emit('passResult', {playerIdx: idx, passes: null});
+  // 라운드 종료 조건: 마지막 낸 사람을 제외한 미완주자 모두 패스?
+  const lastPlayIdx = rooms[roomId].game.lastPlay ? rooms[roomId].game.lastPlay.playerIdx : null;
+  const activeIdxs = rooms[roomId].game.ordered.map((p, i) => i)
+    .filter(i => i !== lastPlayIdx && !rooms[roomId].game.finished[i]);
+  const allPassed = activeIdxs.every(i => rooms[roomId].game.passedThisRound[i]);
   const activePlayersCount = rooms[roomId].players.length - rooms[roomId].game.finished.filter(f => f).length;
-  if (rooms[roomId].game.passes >= activePlayersCount-1 && activePlayersCount > 1) {
-    rooms[roomId].game.passes = 0;
+  if (allPassed && activePlayersCount > 1) {
+    rooms[roomId].game.passedThisRound = Array(rooms[roomId].game.ordered.length).fill(false);
     if (rooms[roomId].game.lastPlay) {
       rooms[roomId].game.turnIdx = rooms[roomId].game.lastPlay.playerIdx;
       if (rooms[roomId].game.finished[rooms[roomId].game.turnIdx]) {
@@ -545,7 +550,7 @@ function autoPassTurn(roomId, socketId) {
       }
     }
     rooms[roomId].game.lastPlay = null;
-    rooms[roomId].game.isFirstTurnOfRound = true; // 새로운 라운드 시작 시 첫 턴 플래그 설정
+    rooms[roomId].game.isFirstTurnOfRound = true;
     io.to(roomId).emit('newRound', {turnIdx: rooms[roomId].game.turnIdx, lastPlay: null, currentPlayer: rooms[roomId].game.ordered[rooms[roomId].game.turnIdx], isFirstTurnOfRound: true});
     startTurnTimer(roomId);
   } else if (activePlayersCount === 1) {
@@ -554,7 +559,7 @@ function autoPassTurn(roomId, socketId) {
   } else {
     do {
       rooms[roomId].game.turnIdx = (rooms[roomId].game.turnIdx + 1) % rooms[roomId].game.ordered.length;
-    } while (rooms[roomId].game.finished[rooms[roomId].game.turnIdx]);
+    } while (rooms[roomId].game.finished[rooms[roomId].game.turnIdx] || rooms[roomId].game.passedThisRound[rooms[roomId].game.turnIdx]);
     io.to(roomId).emit('turnChanged', { turnIdx: rooms[roomId].game.turnIdx, currentPlayer: rooms[roomId].game.ordered[rooms[roomId].game.turnIdx], isFirstTurnOfRound: false });
     startTurnTimer(roomId);
   }
@@ -686,15 +691,16 @@ io.on('connection', (socket) => {
         playerHands: [],
         finished: [],
         finishOrder: [],
+        passedThisRound: [], // <--- 추가
         gameCount: 1,
-        lastGameScores: {},
-        totalScores: {},
+        lastGameScores: {}, // { nickname: score }
+        totalScores: {},    // { nickname: totalScore }
         cardExchangeInProgress: false,
         slaveCardsGiven: [],
         minerCardsGiven: [],
         dalmutiCardSelected: false,
         archbishopCardSelected: false,
-        isFirstTurnOfRound: false
+        isFirstTurnOfRound: false // 새로운 라운드의 첫 턴인지 추적
       };
     }
     // 카드 교환 중이 아니면 게임 시작 체크
@@ -863,6 +869,7 @@ io.on('connection', (socket) => {
     // 카드 제출 후 손패 정렬
     hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b));
     rooms[socket.roomId].game.lastPlay = {count: cards.length, number: num, playerIdx: idx, cards: [...cards]};
+    rooms[socket.roomId].game.passedThisRound = Array(rooms[socket.roomId].game.ordered.length).fill(false); // <--- 카드 내면 패스상태 초기화
     rooms[socket.roomId].game.passes = 0;
     rooms[socket.roomId].game.isFirstTurnOfRound = false; // 카드를 내면 첫 턴 플래그 해제
 
@@ -871,7 +878,8 @@ io.on('connection', (socket) => {
       // 현재 턴을 제외한 미완주 플레이어 인덱스
       const activeIdxs = rooms[socket.roomId].game.ordered.map((p, i) => i).filter(i => i !== idx && !rooms[socket.roomId].game.finished[i]);
       activeIdxs.forEach(i => {
-        io.to(socket.roomId).emit('passResult', {playerIdx: i, passes: rooms[socket.roomId].game.passes + 1});
+        rooms[socket.roomId].game.passedThisRound[i] = true; // <--- 1을 내면 나머지 미완주자 모두 패스 처리
+        io.to(socket.roomId).emit('passResult', {playerIdx: i, passes: null});
       });
       
       // 1을 낸 플레이어의 게임 완주 처리
@@ -1140,13 +1148,13 @@ io.on('connection', (socket) => {
       console.log('*** Only one player remaining. Must play cards. ***');
       // 패스 처리는 하지 않고 턴을 그대로 유지
     } else {
+      // 다음 턴: finished 또는 passedThisRound가 true인 플레이어는 건너뜀
       do {
         rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
-      } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]);
+      } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx] || rooms[socket.roomId].game.passedThisRound[rooms[socket.roomId].game.turnIdx]);
       io.to(socket.roomId).emit('turnChanged', { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: false });
       startTurnTimer(socket.roomId);
     }
-    
     cb && cb({success: true});
   });
 
