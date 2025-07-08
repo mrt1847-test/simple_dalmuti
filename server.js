@@ -1000,21 +1000,22 @@ io.on('connection', (socket) => {
           rooms[socket.roomId].game.gameCount = (rooms[socket.roomId].game.gameCount || 1) + 1; // 게임 횟수 증가
           // lastGameScores, totalScores는 유지
 
-        startGameIfReady(socket.roomId);
-      }, 5000);
-      return;
+          startGameIfReady(socket.roomId);
+        }, 5000);
+        return;
+      }
+      
+      // 다음 턴
+      do {
+        rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
+      } while (
+        rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx] ||
+        rooms[socket.roomId].game.passedThisRound[rooms[socket.roomId].game.turnIdx] ||
+        rooms[socket.roomId].game.turnIdx === idx // 방금 낸 본인도 건너뜀
+      );
+      io.to(socket.roomId).emit('turnChanged', { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: false });
+      startTurnTimer(socket.roomId);
     }
-    
-    // 다음 턴
-    do {
-      rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
-    } while (
-      rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx] ||
-      rooms[socket.roomId].game.passedThisRound[rooms[socket.roomId].game.turnIdx]
-    );
-    
-    io.to(socket.roomId).emit('turnChanged', { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: false });
-    startTurnTimer(socket.roomId);
   });
   
   socket.on('passTurn', (cb) => {
