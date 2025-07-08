@@ -944,10 +944,8 @@ io.on('connection', (socket) => {
       // 현재 턴을 제외한 미완주 플레이어 인덱스
       const activeIdxs = rooms[socket.roomId].game.ordered.map((p, i) => i).filter(i => i !== idx && !rooms[socket.roomId].game.finished[i]);
       activeIdxs.forEach(i => {
-        rooms[socket.roomId].game.passedThisRound[i] = true; // <--- 1을 내면 나머지 미완주자 모두 패스 처리
-        // io.to(socket.roomId).emit('passResult', {playerIdx: i, passes: null}); // <--- passResult emit 제거
+        rooms[socket.roomId].game.passedThisRound[i] = true; // 1을 내면 나머지 미완주자 모두 패스 처리
       });
-      
       // 1을 낸 플레이어의 게임 완주 처리 (do-while 전에 무조건 처리)
       if (hand.length === 0 && !rooms[socket.roomId].game.finished[idx]) {
         rooms[socket.roomId].game.finished[idx] = true;
@@ -1005,14 +1003,20 @@ io.on('connection', (socket) => {
         }, 5000);
         return;
       }
-      // hand.length === 0에서 return하지 않고, 아래 턴 넘김(for문) 실행
+      // 라운드 리셋: passedThisRound 전체 false, lastPlay = null, isFirstTurnOfRound = true
+      rooms[socket.roomId].game.passedThisRound = Array(rooms[socket.roomId].game.ordered.length).fill(false);
+      rooms[socket.roomId].game.lastPlay = null;
+      rooms[socket.roomId].game.isFirstTurnOfRound = true;
+      // turnIdx를 다음 미완주자로 이동
       do {
         rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
-      } while (
-        rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]
-      );
-      
-      io.to(socket.roomId).emit('turnChanged', { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: false });
+      } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]);
+      io.to(socket.roomId).emit('newRound', {
+        turnIdx: rooms[socket.roomId].game.turnIdx,
+        lastPlay: null,
+        currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx],
+        isFirstTurnOfRound: true
+      });
       startTurnTimer(socket.roomId);
       return;
     }
