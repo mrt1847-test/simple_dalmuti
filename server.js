@@ -189,6 +189,7 @@ function startGameIfReady(roomId) {
     rooms[roomId].game.finished = Array(rooms[roomId].game.ordered.length).fill(false);
     rooms[roomId].game.finishOrder = [];
     rooms[roomId].game.isFirstTurnOfRound = true; // 게임 시작 시 첫 턴 플래그 설정
+    rooms[roomId].game.revolutionPending = true;
     // gameCount, lastGameScores, totalScores는 게임이 완전히 끝날 때 초기화하거나 다음 라운드 시작 시 해야 함
 
     // 4. 카드 분배 및 저장
@@ -268,21 +269,14 @@ function startGameIfReady(roomId) {
     const joker2Idx = hands.findIndex(hand => hand.filter(c => c === 'J').length === 2);
     console.log(`혁명 기회 체크 - 조커 2장 보유자 인덱스: ${joker2Idx}`);
     if (joker2Idx !== -1) {
-      rooms[roomId].game.revolutionPending = true; // 혁명 대기 상태 시작
+      rooms[roomId].game.revolutionPending = true; // 혁명 조건이면 true 유지
       console.log('[revolutionPending] 혁명 선택 대기 상태 진입');
-      console.log('🎯 혁명 기회 발견! 조커 2장 보유자:', rooms[roomId].game.ordered[joker2Idx].nickname);
-      // 혁명 선택이 필요한 경우 gameStart 이벤트를 보내지 않음
-      // 클라이언트들에게 게임 페이지로 이동하라고 알림 (혁명 선택용)
       io.to(roomId).emit('gameStart', { needRevolutionChoice: true });
       console.log('혁명 기회! gameStart 이벤트 전송 (혁명 선택용). 클라이언트들이 game.html로 이동합니다.');
-      
-      // 5초 후에 혁명 선택 요청 (클라이언트들이 game.html로 이동할 시간을 더 줌)
       setTimeout(() => {
         console.log('⏰ 혁명 선택 요청 시작');
-        // 혁명 선택 기회 부여
         const revPlayer = rooms[roomId].game.ordered[joker2Idx];
         console.log(`혁명 선택 요청 대상: ${revPlayer.nickname} (${revPlayer.id})`);
-        
         try {
           io.to(revPlayer.id).emit('revolutionChoice', {
             role: revPlayer.role,
@@ -292,8 +286,6 @@ function startGameIfReady(roomId) {
         } catch (error) {
           console.error(`❌ ${revPlayer.nickname}에게 revolutionChoice 이벤트 전송 실패:`, error);
         }
-        
-        // 나머지 플레이어들은 대기 메시지
         rooms[roomId].game.ordered.forEach((p, i) => {
           if (i !== joker2Idx) {
             try {
@@ -306,6 +298,9 @@ function startGameIfReady(roomId) {
         });
       }, 5000);
       return;
+    } else {
+      rooms[roomId].game.revolutionPending = false; // 혁명 조건이 아니면 false로 재설정
+      console.log('[revolutionPending] 혁명 조건 아님 - revolutionPending false로 재설정');
     }
     // 혁명 기회가 없으면 기존 카드 교환 단계로 진행
     // 5. 카드 교환 단계 (농노 ↔ 달무티, 광부 ↔ 대주교)
