@@ -1178,13 +1178,7 @@ io.on('connection', (socket) => {
     if (allPassed && activePlayersCount > 1) {
       // 라운드 리셋
       rooms[socket.roomId].game.passedThisRound = Array(rooms[socket.roomId].game.ordered.length).fill(false);
-      // turnIdx가 finished/passedThisRound가 true인 플레이어가 아니도록 보정
-      do {
-        rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
-      } while (
-        rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx] ||
-        rooms[socket.roomId].game.passedThisRound[rooms[socket.roomId].game.turnIdx]
-      );
+      // turnIdx 보정 do-while문 제거 (중복 증가 방지)
       // 디버그: 라운드 리셋 직후 상태 출력
       console.log('[passTurn] round reset:', {
         turnIdx: rooms[socket.roomId].game.turnIdx,
