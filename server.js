@@ -96,6 +96,7 @@ function resetGame(roomId) {
     turnIdx: 0,
     lastPlay: null,
     passes: 0,
+    playerPassed: [], // 각 플레이어의 패스 여부
     playerHands: [],
     finished: [],
     finishOrder: [],
@@ -185,6 +186,7 @@ function startGameIfReady(roomId) {
     rooms[roomId].game.turnIdx = 0;
     rooms[roomId].game.lastPlay = null;
     rooms[roomId].game.passes = 0;
+    rooms[roomId].game.playerPassed = Array(rooms[roomId].game.ordered.length).fill(false); // 각 플레이어의 패스 여부
     rooms[roomId].game.finished = Array(rooms[roomId].game.ordered.length).fill(false);
     rooms[roomId].game.finishOrder = [];
     rooms[roomId].game.isFirstTurnOfRound = true; // 게임 시작 시 첫 턴 플래그 설정
@@ -531,12 +533,27 @@ function autoPassTurn(roomId, socketId) {
   // 타임오버로 인한 자동 패스는 첫 턴이라도 허용
   console.log(`\n--- [autoPassTurn] ${rooms[roomId].game.ordered[idx].nickname}이 타임오버로 자동 패스됨 (첫 턴 여부: ${rooms[roomId].game.isFirstTurnOfRound}) ---`);
   
+  rooms[roomId].game.playerPassed[idx] = true; // 해당 플레이어의 패스 상태를 true로 설정
   rooms[roomId].game.passes++;
   io.to(roomId).emit('passResult', {playerIdx: idx, passes: rooms[roomId].game.passes});
+  
   // 현재 게임에 참여 중인(완주하지 않은) 플레이어 수 계산
   const activePlayersCount = rooms[roomId].players.length - rooms[roomId].game.finished.filter(f => f).length;
-  if (rooms[roomId].game.passes >= activePlayersCount-1 && activePlayersCount > 1) {
+  
+  // 마지막으로 카드를 낸 사람을 제외하고 모든 플레이어가 패스했는지 확인
+  const lastPlayerIdx = rooms[roomId].game.lastPlay ? rooms[roomId].game.lastPlay.playerIdx : -1;
+  const allOthersPassed = rooms[roomId].game.ordered.every((player, i) => {
+    if (rooms[roomId].game.finished[i]) return true; // 완주한 플레이어는 무시
+    if (i === lastPlayerIdx) return true; // 마지막으로 카드를 낸 사람은 무시
+    return rooms[roomId].game.playerPassed[i]; // 나머지는 패스했는지 확인
+  });
+
+  if (allOthersPassed && activePlayersCount > 1) {
+    console.log('*** All players except the last player have passed. Starting a new round. ***');
+    // 모든 플레이어의 패스 상태 리셋
+    rooms[roomId].game.playerPassed.fill(false);
     rooms[roomId].game.passes = 0;
+    
     if (rooms[roomId].game.lastPlay) {
       rooms[roomId].game.turnIdx = rooms[roomId].game.lastPlay.playerIdx;
       if (rooms[roomId].game.finished[rooms[roomId].game.turnIdx]) {
@@ -553,9 +570,11 @@ function autoPassTurn(roomId, socketId) {
     // 플레이어가 1명만 남은 경우, 패스할 수 없고 카드를 내야 함
     // 패스 처리는 하지 않고 턴을 그대로 유지
   } else {
+    // 다음 패스하지 않은 플레이어에게 턴 넘기기
     do {
       rooms[roomId].game.turnIdx = (rooms[roomId].game.turnIdx + 1) % rooms[roomId].game.ordered.length;
-    } while (rooms[roomId].game.finished[rooms[roomId].game.turnIdx]);
+    } while (rooms[roomId].game.finished[rooms[roomId].game.turnIdx] || rooms[roomId].game.playerPassed[rooms[roomId].game.turnIdx]);
+    
     io.to(roomId).emit('turnChanged', { turnIdx: rooms[roomId].game.turnIdx, currentPlayer: rooms[roomId].game.ordered[rooms[roomId].game.turnIdx], isFirstTurnOfRound: false });
     startTurnTimer(roomId);
   }
@@ -684,6 +703,7 @@ io.on('connection', (socket) => {
         turnIdx: 0,
         lastPlay: null,
         passes: 0,
+        playerPassed: [], // 각 플레이어의 패스 여부
         playerHands: [],
         finished: [],
         finishOrder: [],
@@ -865,6 +885,8 @@ io.on('connection', (socket) => {
     hand.sort((a, b) => (a === 'J' ? 13 : a) - (b === 'J' ? 13 : b));
     rooms[socket.roomId].game.lastPlay = {count: cards.length, number: num, playerIdx: idx, cards: [...cards]};
     rooms[socket.roomId].game.passes = 0;
+    // 카드를 낸 플레이어의 패스 상태 리셋
+    rooms[socket.roomId].game.playerPassed[idx] = false;
     rooms[socket.roomId].game.isFirstTurnOfRound = false; // 카드를 내면 첫 턴 플래그 해제
 
     // 1 또는 1+조커를 낸 경우: 즉시 모든 미완주 플레이어 패스 처리 및 라운드 리셋
@@ -929,6 +951,7 @@ io.on('connection', (socket) => {
           rooms[socket.roomId].game.turnIdx = 0;
           rooms[socket.roomId].game.lastPlay = null;
           rooms[socket.roomId].game.passes = 0;
+          rooms[socket.roomId].game.playerPassed = [];
           rooms[socket.roomId].game.playerHands = [];
           rooms[socket.roomId].game.finished = [];
           rooms[socket.roomId].game.finishOrder = [];
@@ -968,6 +991,7 @@ io.on('connection', (socket) => {
       }
       // 완주가 아니라면 기존대로 라운드 리셋
       rooms[socket.roomId].game.passes = 0;
+      rooms[socket.roomId].game.playerPassed.fill(false); // 모든 플레이어의 패스 상태 리셋
       rooms[socket.roomId].game.turnIdx = idx;
       rooms[socket.roomId].game.lastPlay = null;
       rooms[socket.roomId].game.isFirstTurnOfRound = true; // 1을 내서 새로운 라운드 시작 시 첫 턴 플래그 설정
@@ -1073,6 +1097,7 @@ io.on('connection', (socket) => {
         rooms[socket.roomId].game.turnIdx = 0;
         rooms[socket.roomId].game.lastPlay = null;
         rooms[socket.roomId].game.passes = 0;
+        rooms[socket.roomId].game.playerPassed = [];
         rooms[socket.roomId].game.playerHands = [];
         rooms[socket.roomId].game.finished = [];
         rooms[socket.roomId].game.finishOrder = [];
@@ -1105,22 +1130,39 @@ io.on('connection', (socket) => {
       return cb && cb({success: false, message: '새로운 라운드의 첫 턴에는 패스할 수 없습니다. 카드를 내주세요.'});
     }
     
+    // 이미 패스한 플레이어는 다시 패스할 수 없음
+    if (rooms[socket.roomId].game.playerPassed[idx]) {
+      console.log(`\n--- [passTurn] ${rooms[socket.roomId].game.ordered[idx].nickname}이 이미 패스한 상태에서 패스 시도 - 거부됨 ---`);
+      return cb && cb({success: false, message: '이미 패스한 플레이어는 다시 패스할 수 없습니다.'});
+    }
+    
     clearTurnTimer(socket.roomId);
+    rooms[socket.roomId].game.playerPassed[idx] = true; // 해당 플레이어의 패스 상태를 true로 설정
     rooms[socket.roomId].game.passes++;
     io.to(socket.roomId).emit('passResult', {playerIdx: idx, passes: rooms[socket.roomId].game.passes});
 
     console.log(`\n--- [passTurn] Event from ${rooms[socket.roomId].game.ordered[idx].nickname} (idx: ${idx}) ---`);
     console.log(`Current passes: ${rooms[socket.roomId].game.passes}`);
+    console.log(`Player passed status:`, rooms[socket.roomId].game.playerPassed);
     
     // 현재 게임에 참여 중인(완주하지 않은) 플레이어 수 계산
     const activePlayersCount = rooms[socket.roomId].players.length - rooms[socket.roomId].game.finished.filter(f => f).length;
     console.log(`Active players: ${activePlayersCount}`);
 
-    // 모두 패스 -> 라운드 리셋
-    // 플레이어가 1명만 남은 경우는 패스하지 않고 카드를 내야 함
-    if (rooms[socket.roomId].game.passes >= activePlayersCount-1 && activePlayersCount > 1) {
-      console.log('*** All active players have passed. Starting a new round. ***');
+    // 마지막으로 카드를 낸 사람을 제외하고 모든 플레이어가 패스했는지 확인
+    const lastPlayerIdx = rooms[socket.roomId].game.lastPlay ? rooms[socket.roomId].game.lastPlay.playerIdx : -1;
+    const allOthersPassed = rooms[socket.roomId].game.ordered.every((player, i) => {
+      if (rooms[socket.roomId].game.finished[i]) return true; // 완주한 플레이어는 무시
+      if (i === lastPlayerIdx) return true; // 마지막으로 카드를 낸 사람은 무시
+      return rooms[socket.roomId].game.playerPassed[i]; // 나머지는 패스했는지 확인
+    });
+
+    if (allOthersPassed && activePlayersCount > 1) {
+      console.log('*** All players except the last player have passed. Starting a new round. ***');
+      // 모든 플레이어의 패스 상태 리셋
+      rooms[socket.roomId].game.playerPassed.fill(false);
       rooms[socket.roomId].game.passes = 0;
+      
       // 마지막으로 카드를 낸 사람이 턴을 잡음
       if (rooms[socket.roomId].game.lastPlay) {
         rooms[socket.roomId].game.turnIdx = rooms[socket.roomId].game.lastPlay.playerIdx;
@@ -1131,7 +1173,6 @@ io.on('connection', (socket) => {
           } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]);
         }
       }
-      // lastPlay가 null이면 (라운드 첫 턴에 모두 패스하는 비정상적 상황) 현재 턴 유지
       rooms[socket.roomId].game.lastPlay = null;
       rooms[socket.roomId].game.isFirstTurnOfRound = true; // 새로운 라운드 시작 시 첫 턴 플래그 설정
       io.to(socket.roomId).emit('newRound', {turnIdx: rooms[socket.roomId].game.turnIdx, lastPlay: null, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: true});
@@ -1141,9 +1182,11 @@ io.on('connection', (socket) => {
       console.log('*** Only one player remaining. Must play cards. ***');
       // 패스 처리는 하지 않고 턴을 그대로 유지
     } else {
+      // 다음 패스하지 않은 플레이어에게 턴 넘기기
       do {
         rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
-      } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]);
+      } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx] || rooms[socket.roomId].game.playerPassed[rooms[socket.roomId].game.turnIdx]);
+      
       io.to(socket.roomId).emit('turnChanged', { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: false });
       startTurnTimer(socket.roomId);
     }
