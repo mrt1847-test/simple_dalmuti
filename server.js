@@ -1424,9 +1424,12 @@ io.on('connection', (socket) => {
       if (revPlayer && revPlayer.role === '노예') {
         // === 대혁명 ===
         io.to(roomId).emit('chat', { nickname: 'SYSTEM', msg: '🔥 대혁명! 신분이 역전됩니다. 카드 교환 없이 게임이 시작됩니다.' });
+        // 1. 기존 역할 순서 저장
+        const originalRoles = rooms[roomId].game.ordered.map(p => p.role);
+        // 2. 순서 역전
         rooms[roomId].game.ordered.reverse();
-        const reversedRoles = rooms[roomId].game.ordered.map(p => p.role).reverse();
-        rooms[roomId].game.ordered.forEach((p, i) => { p.role = reversedRoles[i]; });
+        // 3. 역전된 순서에 기존 역할을 앞에서부터 부여
+        rooms[roomId].game.ordered.forEach((p, i) => { p.role = originalRoles[i]; });
         setTimeout(() => {
           startGameAfterCardExchange(roomId);
         }, 2000);
