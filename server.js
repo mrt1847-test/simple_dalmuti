@@ -1003,7 +1003,21 @@ io.on('connection', (socket) => {
         }, 5000);
         return;
       }
-      // 4. 라운드 리셋: passedThisRound 전체 false, lastPlay = null, isFirstTurnOfRound = true
+      
+      // 1을 내면 즉시 다른 모든 미완주 플레이어들이 패스되므로 라운드가 종료됨
+      // 라운드 종료: 1을 낸 플레이어의 턴으로 설정
+      rooms[socket.roomId].game.passedThisRound = Array(rooms[socket.roomId].game.ordered.length).fill(false);
+      rooms[socket.roomId].game.lastPlay = null;
+      rooms[socket.roomId].game.isFirstTurnOfRound = true;
+      rooms[socket.roomId].game.turnIdx = idx; // 1을 낸 플레이어의 턴으로 설정
+      
+      // 1을 낸 플레이어가 완주했다면 다음 미완주자로 이동
+      if (rooms[socket.roomId].game.finished[idx]) {
+        do {
+          rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
+        } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]);
+      }
+      
       // --- 라운드 리셋 전에 playResult를 한 번 더 emit (클라 완주 상태 반영용) ---
       rooms[socket.roomId].game.ordered.forEach((p, i) => {
         const targetSocket = io.sockets.sockets.get(p.id);
@@ -1018,13 +1032,7 @@ io.on('connection', (socket) => {
           });
         }
       });
-      rooms[socket.roomId].game.passedThisRound = Array(rooms[socket.roomId].game.ordered.length).fill(false);
-      rooms[socket.roomId].game.lastPlay = null;
-      rooms[socket.roomId].game.isFirstTurnOfRound = true;
-      // turnIdx를 다음 미완주자로 이동
-      do {
-        rooms[socket.roomId].game.turnIdx = (rooms[socket.roomId].game.turnIdx + 1) % rooms[socket.roomId].game.ordered.length;
-      } while (rooms[socket.roomId].game.finished[rooms[socket.roomId].game.turnIdx]);
+      
       io.to(socket.roomId).emit('newRound', {
         turnIdx: rooms[socket.roomId].game.turnIdx,
         lastPlay: null,
