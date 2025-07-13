@@ -1227,6 +1227,8 @@ io.on('connection', (socket) => {
       });
       io.to(socket.roomId).emit('turnChanged', { turnIdx: rooms[socket.roomId].game.turnIdx, currentPlayer: rooms[socket.roomId].game.ordered[rooms[socket.roomId].game.turnIdx], isFirstTurnOfRound: false });
       startTurnTimer(socket.roomId);
+      const passedPlayers = rooms[socket.roomId].game.ordered.map((p, i) => rooms[socket.roomId].game.passedThisRound[i] ? p.nickname : null).filter(Boolean);
+      io.to(socket.roomId).emit('chat', {nickname: 'SYSTEM', msg: `이번 라운드 패스한 플레이어: ${passedPlayers.length > 0 ? passedPlayers.join(', ') : '없음'}`});
     }
     cb && cb({success: true});
   });
