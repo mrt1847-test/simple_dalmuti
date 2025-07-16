@@ -254,6 +254,48 @@
       if (card === 'J') return 'img/j.png';
       return `img/${card}.png`;
     }
+    // 카드 이동 애니메이션 함수
+    function animateCardMove(fromElem, toElem, cardImgSrc, onComplete) {
+      const fromRect = fromElem.getBoundingClientRect();
+      const toRect = toElem.getBoundingClientRect();
+      const card = document.createElement('img');
+      card.src = cardImgSrc;
+      card.style.position = 'fixed';
+      card.style.left = fromRect.left + 'px';
+      card.style.top = fromRect.top + 'px';
+      card.style.width = fromRect.width + 'px';
+      card.style.height = fromRect.height + 'px';
+      card.style.transition = 'all 0.5s cubic-bezier(.4,2,.6,1)';
+      card.style.zIndex = 9999;
+      document.body.appendChild(card);
+      setTimeout(() => {
+        card.style.left = toRect.left + 'px';
+        card.style.top = toRect.top + 'px';
+        card.style.width = toRect.width + 'px';
+        card.style.height = toRect.height + 'px';
+      }, 10);
+      card.addEventListener('transitionend', () => {
+        card.remove();
+        if (onComplete) onComplete();
+      });
+    }
+    // 여러 장 카드 이동 애니메이션
+    function animateMultipleCards(cards, fromElems, toElem, cardImgSrcs, onComplete) {
+      let completed = 0;
+      cards.forEach((card, idx) => {
+        setTimeout(() => {
+          animateCardMove(
+            fromElems[idx],
+            toElem,
+            cardImgSrcs[idx],
+            () => {
+              completed++;
+              if (completed === cards.length && onComplete) onComplete();
+            }
+          );
+        }, idx * 80); // 80ms 간격
+      });
+    }
     document.addEventListener('DOMContentLoaded', function() {
       // 쿼리스트링에서 roomId, nickname 추출
       function getQueryParam(name) {
@@ -436,8 +478,8 @@
           html += '<div id="handArea" style="display:flex;background:#eee;padding:10px;box-sizing:border-box;margin:0 auto 10px auto;overflow:visible;">';
           myCards.forEach((card, i) => {
             const isSelected = selected.includes(i);
-            html += `<div class="cardBtn" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''};position:relative;">`;
-            html += `<div style="width:100px;height:157px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:3px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;display:flex;align-items:center;justify-content:center;">`;
+            html += `<div class="cardBtn${isSelected ? ' selected' : ''}" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''};position:relative;">`;
+            html += `<div class="cardInner" style="width:100px;height:157px;background:#fffbe6;border:3px solid #bdb76b;box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.18s cubic-bezier(.4,2,.6,1);border-radius:8px;display:flex;align-items:center;justify-content:center;transform:${isSelected ? 'translateY(-18px) scale(1.05)' : 'translateY(0)'};z-index:${isSelected ? 2 : 1};">`;
             html += `<img src=\"${getCardImageSrc(card)}\" alt=\"${card}\" style=\"width:100%;height:100%;object-fit:contain;opacity:0.85;\">`;
             html += `<div style=\"position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:1.7em;font-weight:bold;color:#111;text-shadow:0 0 6px #fff, 0 0 3px #fff, 0 0 1px #fff;pointer-events:none;\">${card === 'J' ? 'J' : card}</div>`;
             html += '</div>';
@@ -576,18 +618,49 @@
           });
         }
 
-        // 내가 낸 카드면 손에서 제거
-        if (player.id === socket.id && data.myCards) {
-          myCards = data.myCards.slice(); // 서버 상태로 동기화
-          selected = [];
-        }
-        
-        // 완주한 플레이어 체크
-        if (data.finished[data.playerIdx]) {
-          appendChat(`🏁 ${player.nickname}님이 완주했습니다!`, false, true);
-        }
-        renderGame();
-        syncTurnTimer();
+        // --- 카드 이동 애니메이션 적용 ---
+        // 1. 필드 중앙 DOM 찾기
+        setTimeout(() => {
+          const gameContent = document.getElementById('gameContent');
+          const fieldElem = gameContent && gameContent.querySelector('.table-circle > div[style*="position:absolute;left:50%;top:50%"]');
+          if (!fieldElem) {
+            renderGame();
+            syncTurnTimer();
+            return;
+          }
+          // 2. 제출한 플레이어의 카드/자리 DOM 찾기
+          let fromElems = [];
+          let cardImgSrcs = data.cards.map(getCardImageSrc);
+          if (player.id === socket.id) {
+            // 내가 제출: 내 손패에서 카드 DOM
+            fromElems = data.cards.map((card, idx) => {
+              // selected는 제출 직전의 인덱스 배열임
+              // 제출된 카드가 여러 장일 때, selected의 순서와 카드 순서가 일치함
+              const selIdx = selected[idx];
+              return document.querySelector('.cardBtn[data-idx="' + selIdx + '"] .cardInner');
+            });
+          } else {
+            // 남이 제출: 원탁의 해당 플레이어 자리에서 카드 DOM
+            // playerIdx로 .player-card[data-player-idx]를 찾음
+            // playerIdx는 ordered의 인덱스
+            const playerCard = gameContent && gameContent.querySelectorAll('.player-card')[data.playerIdx];
+            fromElems = data.cards.map(() => playerCard);
+          }
+          // 3. 애니메이션 실행 후 실제 렌더링
+          animateMultipleCards(data.cards, fromElems, fieldElem, cardImgSrcs, () => {
+            // 내가 낸 카드면 손에서 제거
+            if (player.id === socket.id && data.myCards) {
+              myCards = data.myCards.slice(); // 서버 상태로 동기화
+              selected = [];
+            }
+            // 완주한 플레이어 체크
+            if (data.finished[data.playerIdx]) {
+              appendChat(`🏁 ${player.nickname}님이 완주했습니다!`, false, true);
+            }
+            renderGame();
+            syncTurnTimer();
+          });
+        }, 0);
       });
       socket.on('turnTimeout', () => {
         appendChat('⏰ 제한시간이 초과되어 자동으로 패스 처리되었습니다.', false, true);
@@ -662,8 +735,8 @@
           html += '<div id="handArea" style="display:flex;background:#eee;padding:10px;box-sizing:border-box;margin:0 auto 10px auto;overflow:visible;">';
           myCards.forEach((card, i) => {
             const isSelected = selected.includes(i);
-            html += `<div class="cardBtn" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''};position:relative;">`;
-            html += `<div style="width:100px;height:157px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:3px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;display:flex;align-items:center;justify-content:center;">`;
+            html += `<div class="cardBtn${isSelected ? ' selected' : ''}" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''};position:relative;">`;
+            html += `<div class="cardInner" style="width:100px;height:157px;background:#fffbe6;border:3px solid #bdb76b;box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.18s cubic-bezier(.4,2,.6,1);border-radius:8px;display:flex;align-items:center;justify-content:center;transform:${isSelected ? 'translateY(-18px) scale(1.05)' : 'translateY(0)'};z-index:${isSelected ? 2 : 1};">`;
             html += `<img src=\"${getCardImageSrc(card)}\" alt=\"${card}\" style=\"width:100%;height:100%;object-fit:contain;opacity:0.85;\">`;
             html += `<div style=\"position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:1.7em;font-weight:bold;color:#111;text-shadow:0 0 6px #fff, 0 0 3px #fff, 0 0 1px #fff;pointer-events:none;\">${card === 'J' ? 'J' : card}</div>`;
             html += '</div>';
@@ -755,8 +828,8 @@
           html += '<div id="handArea" style="display:flex;background:#eee;padding:10px;box-sizing:border-box;margin:0 auto 10px auto;overflow:visible;">';
           myCards.forEach((card, i) => {
             const isSelected = selected.includes(i);
-            html += `<div class="cardBtn" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''};position:relative;">`;
-            html += `<div style="width:100px;height:157px;background:${isSelected ? '#ffe082' : '#fffbe6'};border:3px solid ${isSelected ? '#ff9800' : '#bdb76b'};box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.2s;border-radius:8px;display:flex;align-items:center;justify-content:center;">`;
+            html += `<div class="cardBtn${isSelected ? ' selected' : ''}" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''};position:relative;">`;
+            html += `<div class="cardInner" style="width:100px;height:157px;background:#fffbe6;border:3px solid #bdb76b;box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.18s cubic-bezier(.4,2,.6,1);border-radius:8px;display:flex;align-items:center;justify-content:center;transform:${isSelected ? 'translateY(-18px) scale(1.05)' : 'translateY(0)'};z-index:${isSelected ? 2 : 1};">`;
             html += `<img src=\"${getCardImageSrc(card)}\" alt=\"${card}\" style=\"width:100%;height:100%;object-fit:contain;opacity:0.85;\">`;
             html += `<div style=\"position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:1.7em;font-weight:bold;color:#111;text-shadow:0 0 6px #fff, 0 0 3px #fff, 0 0 1px #fff;pointer-events:none;\">${card === 'J' ? 'J' : card}</div>`;
             html += '</div>';
@@ -1155,5 +1228,16 @@
       });
     });
   </script>
+  <style>
+    /* 카드 선택 효과 CSS 추가 */
+    .cardBtn.selected .cardInner {
+      transform: translateY(-18px) scale(1.05) !important;
+      box-shadow: 0 8px 24px #0003 !important;
+      z-index: 2 !important;
+    }
+    .cardBtn .cardInner {
+      transition: all 0.18s cubic-bezier(.4,2,.6,1);
+    }
+  </style>
 </body>
 </html> 
