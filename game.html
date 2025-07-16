@@ -416,7 +416,7 @@
               borderColor = '#9e9e9e';
             }
 
-            html += `<div class="player-card" style="position:absolute;left:${x}px;top:${y}px;width:${playerCardWidth}px;height:${playerCardHeight}px;text-align:center;background:${backgroundColor};border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.08);padding:0.5em 0.2em;display:flex;flex-direction:column;justify-content:center;align-items:center;border: 3px solid ${borderColor}; transition: all 0.3s;">
+            html += `<div class="player-card" data-id="${p.id}" style="position:absolute;left:${x}px;top:${y}px;width:${playerCardWidth}px;height:${playerCardHeight}px;text-align:center;background:${backgroundColor};border-radius:12px;box-shadow:0 1px 6px rgba(0,0,0,0.08);padding:0.5em 0.2em;display:flex;flex-direction:column;justify-content:center;align-items:center;border: 3px solid ${borderColor}; transition: all 0.3s;">
               <div style='font-weight:bold;font-size:1.1em;'>${p.role}</div>
               <div style='margin:0.2em 0;'>${p.nickname}</div>
               <div style='font-size:0.9em;color:#666;'>${isFinished ? '🏁 완주!' : `카드 ${p.cardCount || 0}장`}</div>
@@ -631,60 +631,90 @@
         }
 
         // --- 카드 이동 애니메이션 적용 ---
-        // 1. 필드 중앙 DOM 찾기
         setTimeout(() => {
           const gameContent = document.getElementById('gameContent');
-          const fieldElem = gameContent && gameContent.querySelector('.table-circle > div[style*="position:absolute;left:50%;top:50%"]');
-          if (!fieldElem) {
-            renderGame();
-            syncTurnTimer();
-            return;
-          }
-          // 2. 제출한 플레이어의 카드/자리 DOM 찾기
+          let fieldElem = gameContent && gameContent.querySelector('.table-circle > div[style*="position:absolute;left:50%;top:50%"]');
+          // --- player id로 .player-card 찾기 (더 견고하게) ---
           let fromElems = [];
           let cardImgSrcs = data.cards.map(getCardImageSrc);
-          // --- selected 배열을 복사해서 사용 (애니메이션 중 selected가 바뀌지 않게) ---
           let selectedSnapshot = (window._lastSelectedSnapshot && Array.isArray(window._lastSelectedSnapshot)) ? window._lastSelectedSnapshot.slice() : [];
           let isMe = player.id === socket.id;
           let duration = isMe ? 0.7 : 0.5;
           let interval = isMe ? 120 : 80;
+          // --- 플레이어 DOM robust하게 찾기 ---
+          let playerCardElem = null;
+          if (!isMe && gameContent) {
+            // .player-card 중 data-id 속성으로 찾기 (id를 data-id로 추가 필요)
+            const allPlayerCards = gameContent.querySelectorAll('.player-card');
+            allPlayerCards.forEach((el) => {
+              if (el.getAttribute('data-id') === player.id) playerCardElem = el;
+            });
+            // fallback: 인덱스
+            if (!playerCardElem && allPlayerCards[data.playerIdx]) playerCardElem = allPlayerCards[data.playerIdx];
+          }
           if (isMe) {
-            // 내가 제출: 내 손패에서 카드 DOM
             fromElems = data.cards.map((card, idx) => {
               const selIdx = selectedSnapshot[idx];
               return document.querySelector('.cardBtn[data-idx="' + selIdx + '"] .cardInner');
             });
           } else {
-            // 남이 제출: 원탁의 해당 플레이어 자리에서 카드 DOM
-            const playerCard = gameContent && gameContent.querySelectorAll('.player-card')[data.playerIdx];
-            fromElems = data.cards.map(() => playerCard);
+            fromElems = data.cards.map(() => playerCardElem);
           }
-          // --- 제출/패스 버튼 비활성화 (중복 제출 방지) ---
-          const submitBtn = document.getElementById('submitBtn');
-          if (submitBtn) submitBtn.disabled = true;
-          const passBtn = document.getElementById('passBtn');
-          if (passBtn) passBtn.disabled = true;
-          // 3. 애니메이션 실행 후 실제 렌더링
-          animateMultipleCards(data.cards, fromElems, fieldElem, cardImgSrcs, () => {
-            // 내가 낸 카드면 손에서 제거
-            if (player.id === socket.id) {
-              if (data.myCards && Array.isArray(data.myCards)) {
-                myCards = data.myCards.slice(); // 서버 상태로 동기화
+          // --- DOM이 없으면 renderGame 후 재시도 (최대 1회) ---
+          function doAnim(retry) {
+            if (!fieldElem || fromElems.some(e => !e)) {
+              if (!retry) {
+                renderGame();
+                setTimeout(() => {
+                  fieldElem = gameContent && gameContent.querySelector('.table-circle > div[style*="position:absolute;left:50%;top:50%"]');
+                  if (!isMe) {
+                    const allPlayerCards = gameContent.querySelectorAll('.player-card');
+                    allPlayerCards.forEach((el) => {
+                      if (el.getAttribute('data-id') === player.id) playerCardElem = el;
+                    });
+                    if (!playerCardElem && allPlayerCards[data.playerIdx]) playerCardElem = allPlayerCards[data.playerIdx];
+                    fromElems = data.cards.map(() => playerCardElem);
+                  } else {
+                    fromElems = data.cards.map((card, idx) => {
+                      const selIdx = selectedSnapshot[idx];
+                      return document.querySelector('.cardBtn[data-idx="' + selIdx + '"] .cardInner');
+                    });
+                  }
+                  doAnim(true);
+                }, 30);
+                return;
               } else {
-                // fallback: selectedSnapshot 기준으로 직접 제거 (비추천, 서버 수정 권장)
-                let temp = myCards.slice();
-                selectedSnapshot.sort((a, b) => b - a).forEach(idx => temp.splice(idx, 1));
-                myCards = temp;
+                // 2회 시도 후에도 없으면 그냥 renderGame만
+                renderGame();
+                syncTurnTimer();
+                return;
               }
-              selected = [];
             }
-            // 완주한 플레이어 체크
-            if (data.finished[data.playerIdx]) {
-              appendChat(`🏁 ${player.nickname}님이 완주했습니다!`, false, true);
-            }
-            renderGame();
-            syncTurnTimer();
-          }, duration, interval);
+            // --- 제출/패스 버튼 비활성화 (중복 제출 방지) ---
+            const submitBtn = document.getElementById('submitBtn');
+            if (submitBtn) submitBtn.disabled = true;
+            const passBtn = document.getElementById('passBtn');
+            if (passBtn) passBtn.disabled = true;
+            // 3. 애니메이션 실행 후 실제 렌더링
+            animateMultipleCards(data.cards, fromElems, fieldElem, cardImgSrcs, () => {
+              if (player.id === socket.id) {
+                if (data.myCards && Array.isArray(data.myCards)) {
+                  myCards = data.myCards.slice();
+                } else {
+                  let temp = myCards.slice();
+                  selectedSnapshot.sort((a, b) => b - a).forEach(idx => temp.splice(idx, 1));
+                  myCards = temp;
+                }
+                selected = [];
+              }
+              if (data.finished[data.playerIdx]) {
+                appendChat(`🏁 ${player.nickname}님이 완주했습니다!`, false, true);
+              }
+              renderGame();
+              syncTurnTimer();
+            }, duration, interval);
+          }
+          doAnim(false);
         }, 0);
       });
       socket.on('turnTimeout', () => {
