@@ -489,7 +489,7 @@
           myCards.forEach((card, i) => {
             const isSelected = selected.includes(i);
             html += `<div class="cardBtn${isSelected ? ' selected' : ''}" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''};position:relative;">`;
-            html += `<div class="cardInner" style="width:100px;height:157px;background:#fffbe6;border:3px solid #bdb76b;box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.18s cubic-bezier(.4,2,.6,1);border-radius:8px;display:flex;align-items:center;justify-content:center;transform:${isSelected ? 'translateY(-18px) scale(1.05)' : 'translateY(0)'};z-index:${isSelected ? 2 : 1};">`;
+            html += `<div class="cardInner" style="width:100px;height:157px;background:#fffbe6;border:3px solid #bdb76b;box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.18s cubic-bezier(.4,2,.6,1);border-radius:8px;display:flex;align-items:center;justify-content:center;transform:${isSelected ? 'translateY(-18px) scale(1.05)' : 'translateY(0)'};z-index:1;">`;
             html += `<img src=\"${getCardImageSrc(card)}\" alt=\"${card}\" style=\"width:100%;height:100%;object-fit:contain;opacity:0.85;\">`;
             html += `<div style=\"position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:1.7em;font-weight:bold;color:#111;text-shadow:0 0 6px #fff, 0 0 3px #fff, 0 0 1px #fff;pointer-events:none;\">${card === 'J' ? 'J' : card}</div>`;
             html += '</div>';
@@ -761,7 +761,7 @@
           myCards.forEach((card, i) => {
             const isSelected = selected.includes(i);
             html += `<div class="cardBtn${isSelected ? ' selected' : ''}" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''};position:relative;">`;
-            html += `<div class="cardInner" style="width:100px;height:157px;background:#fffbe6;border:3px solid #bdb76b;box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.18s cubic-bezier(.4,2,.6,1);border-radius:8px;display:flex;align-items:center;justify-content:center;transform:${isSelected ? 'translateY(-18px) scale(1.05)' : 'translateY(0)'};z-index:${isSelected ? 2 : 1};">`;
+            html += `<div class="cardInner" style="width:100px;height:157px;background:#fffbe6;border:3px solid #bdb76b;box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.18s cubic-bezier(.4,2,.6,1);border-radius:8px;display:flex;align-items:center;justify-content:center;transform:${isSelected ? 'translateY(-18px) scale(1.05)' : 'translateY(0)'};z-index:1;">`;
             html += `<img src=\"${getCardImageSrc(card)}\" alt=\"${card}\" style=\"width:100%;height:100%;object-fit:contain;opacity:0.85;\">`;
             html += `<div style=\"position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:1.7em;font-weight:bold;color:#111;text-shadow:0 0 6px #fff, 0 0 3px #fff, 0 0 1px #fff;pointer-events:none;\">${card === 'J' ? 'J' : card}</div>`;
             html += '</div>';
@@ -854,7 +854,7 @@
           myCards.forEach((card, i) => {
             const isSelected = selected.includes(i);
             html += `<div class="cardBtn${isSelected ? ' selected' : ''}" data-idx="${i}" style="overflow:visible;width:40px;flex-grow:1;${i === myCards.length - 1 ? 'width:100px;flex-grow:0;' : ''};position:relative;">`;
-            html += `<div class="cardInner" style="width:100px;height:157px;background:#fffbe6;border:3px solid #bdb76b;box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.18s cubic-bezier(.4,2,.6,1);border-radius:8px;display:flex;align-items:center;justify-content:center;transform:${isSelected ? 'translateY(-18px) scale(1.05)' : 'translateY(0)'};z-index:${isSelected ? 2 : 1};">`;
+            html += `<div class="cardInner" style="width:100px;height:157px;background:#fffbe6;border:3px solid #bdb76b;box-shadow:-5px 0px 10px rgba(0,0,0,0.5);box-sizing:border-box;position:relative;cursor:pointer;transition:all 0.18s cubic-bezier(.4,2,.6,1);border-radius:8px;display:flex;align-items:center;justify-content:center;transform:${isSelected ? 'translateY(-18px) scale(1.05)' : 'translateY(0)'};z-index:1;">`;
             html += `<img src=\"${getCardImageSrc(card)}\" alt=\"${card}\" style=\"width:100%;height:100%;object-fit:contain;opacity:0.85;\">`;
             html += `<div style=\"position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:1.7em;font-weight:bold;color:#111;text-shadow:0 0 6px #fff, 0 0 3px #fff, 0 0 1px #fff;pointer-events:none;\">${card === 'J' ? 'J' : card}</div>`;
             html += '</div>';
@@ -1258,7 +1258,6 @@
     .cardBtn.selected .cardInner {
       transform: translateY(-18px) scale(1.05) !important;
       box-shadow: 0 8px 24px #0003 !important;
-      z-index: 2 !important;
     }
     .cardBtn .cardInner {
       transition: all 0.18s cubic-bezier(.4,2,.6,1);
