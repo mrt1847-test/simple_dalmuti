@@ -254,8 +254,8 @@
       if (card === 'J') return 'img/j.png';
       return `img/${card}.png`;
     }
-    // 카드 이동 애니메이션 함수
-    function animateCardMove(fromElem, toElem, cardImgSrc, onComplete) {
+    // 카드 이동 애니메이션 함수 (잔상/중복 방지, z-index, duration)
+    function animateCardMove(fromElem, toElem, cardImgSrc, onComplete, zIndex = 9999, duration = 0.5) {
       const fromRect = fromElem.getBoundingClientRect();
       const toRect = toElem.getBoundingClientRect();
       const card = document.createElement('img');
@@ -265,22 +265,30 @@
       card.style.top = fromRect.top + 'px';
       card.style.width = fromRect.width + 'px';
       card.style.height = fromRect.height + 'px';
-      card.style.transition = 'all 0.5s cubic-bezier(.4,2,.6,1)';
-      card.style.zIndex = 9999;
+      card.style.transition = `all ${duration}s cubic-bezier(.4,2,.6,1)`;
+      card.style.zIndex = zIndex;
+      card.className = 'flying-card-anim';
       document.body.appendChild(card);
+      card.offsetWidth; // 강제 reflow
       setTimeout(() => {
         card.style.left = toRect.left + 'px';
         card.style.top = toRect.top + 'px';
         card.style.width = toRect.width + 'px';
         card.style.height = toRect.height + 'px';
       }, 10);
-      card.addEventListener('transitionend', () => {
-        card.remove();
-        if (onComplete) onComplete();
-      });
+      let removed = false;
+      function cleanup() {
+        if (!removed) {
+          card.remove();
+          removed = true;
+          if (onComplete) onComplete();
+        }
+      }
+      card.addEventListener('transitionend', cleanup);
+      setTimeout(cleanup, duration * 1000 + 200); // transitionend 누락 대비
     }
-    // 여러 장 카드 이동 애니메이션
-    function animateMultipleCards(cards, fromElems, toElem, cardImgSrcs, onComplete) {
+    // 여러 장 카드 이동 애니메이션 (z-index, duration, interval)
+    function animateMultipleCards(cards, fromElems, toElem, cardImgSrcs, onComplete, duration = 0.5, interval = 80) {
       let completed = 0;
       cards.forEach((card, idx) => {
         setTimeout(() => {
@@ -291,9 +299,11 @@
             () => {
               completed++;
               if (completed === cards.length && onComplete) onComplete();
-            }
+            },
+            9999 + idx,
+            duration
           );
-        }, idx * 80); // 80ms 간격
+        }, idx * interval);
       });
     }
     document.addEventListener('DOMContentLoaded', function() {
@@ -543,13 +553,15 @@
               alert('제출할 카드를 선택하세요.');
               return;
             }
+            // --- 제출 직전 selectedSnapshot 저장 ---
+            window._lastSelectedSnapshot = selected.slice();
             const cardsToPlay = selected.map(i => myCards[i]);
             socket.emit('playCards', cardsToPlay, (res) => {
               if (res && !res.success) {
                 alert(res.message);
               } else {
-                // 성공 시 선택 해제
-                selected = [];
+                // 성공 시 선택 해제 (실제 손패 갱신은 playResult에서)
+                // selected = [];
               }
             });
           };
@@ -631,26 +643,39 @@
           // 2. 제출한 플레이어의 카드/자리 DOM 찾기
           let fromElems = [];
           let cardImgSrcs = data.cards.map(getCardImageSrc);
-          if (player.id === socket.id) {
+          // --- selected 배열을 복사해서 사용 (애니메이션 중 selected가 바뀌지 않게) ---
+          let selectedSnapshot = (window._lastSelectedSnapshot && Array.isArray(window._lastSelectedSnapshot)) ? window._lastSelectedSnapshot.slice() : [];
+          let isMe = player.id === socket.id;
+          let duration = isMe ? 0.7 : 0.5;
+          let interval = isMe ? 120 : 80;
+          if (isMe) {
             // 내가 제출: 내 손패에서 카드 DOM
             fromElems = data.cards.map((card, idx) => {
-              // selected는 제출 직전의 인덱스 배열임
-              // 제출된 카드가 여러 장일 때, selected의 순서와 카드 순서가 일치함
-              const selIdx = selected[idx];
+              const selIdx = selectedSnapshot[idx];
               return document.querySelector('.cardBtn[data-idx="' + selIdx + '"] .cardInner');
             });
           } else {
             // 남이 제출: 원탁의 해당 플레이어 자리에서 카드 DOM
-            // playerIdx로 .player-card[data-player-idx]를 찾음
-            // playerIdx는 ordered의 인덱스
             const playerCard = gameContent && gameContent.querySelectorAll('.player-card')[data.playerIdx];
             fromElems = data.cards.map(() => playerCard);
           }
+          // --- 제출/패스 버튼 비활성화 (중복 제출 방지) ---
+          const submitBtn = document.getElementById('submitBtn');
+          if (submitBtn) submitBtn.disabled = true;
+          const passBtn = document.getElementById('passBtn');
+          if (passBtn) passBtn.disabled = true;
           // 3. 애니메이션 실행 후 실제 렌더링
           animateMultipleCards(data.cards, fromElems, fieldElem, cardImgSrcs, () => {
             // 내가 낸 카드면 손에서 제거
-            if (player.id === socket.id && data.myCards) {
-              myCards = data.myCards.slice(); // 서버 상태로 동기화
+            if (player.id === socket.id) {
+              if (data.myCards && Array.isArray(data.myCards)) {
+                myCards = data.myCards.slice(); // 서버 상태로 동기화
+              } else {
+                // fallback: selectedSnapshot 기준으로 직접 제거 (비추천, 서버 수정 권장)
+                let temp = myCards.slice();
+                selectedSnapshot.sort((a, b) => b - a).forEach(idx => temp.splice(idx, 1));
+                myCards = temp;
+              }
               selected = [];
             }
             // 완주한 플레이어 체크
@@ -659,7 +684,7 @@
             }
             renderGame();
             syncTurnTimer();
-          });
+          }, duration, interval);
         }, 0);
       });
       socket.on('turnTimeout', () => {
